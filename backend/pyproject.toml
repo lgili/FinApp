@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "finlite"
+version = "0.1.0"
+description = "Local-first double-entry accounting toolkit"
+readme = "README.md"
+authors = [{ name = "Luiz G" }]
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.13",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "rich>=13.7",
+    "sqlalchemy>=2.0",
+    "typer[all]>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+fin = "finlite.cli.app:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "N", "UP", "SIM", "PL", "RUF"]
+ignore = ["N806", "SIM105", "B008", "PLW0603"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+show_error_codes = true
+plugins = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+branch = true
+source = ["finlite"]
