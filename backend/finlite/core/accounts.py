@@ -67,10 +67,10 @@ def seed_default_chart(session: Session, chart: Iterable[AccountCreate] = DEFAUL
 
 
 __all__ = [
-    "AccountCreate",
-    "AccountType",
-    "AccountError",
     "AccountAlreadyExistsError",
+    "AccountCreate",
+    "AccountError",
+    "AccountType",
     "create_account",
     "list_accounts",
     "seed_default_chart",

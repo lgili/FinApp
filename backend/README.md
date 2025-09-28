@@ -6,6 +6,10 @@ This package contains the CLI-first double-entry ledger core for Finlite.
 
 - SQLite storage with Alembic migrations
 - Typer-based CLI (`fin`)
+   - `fin accounts` for chart management
+   - `fin txn add` for manual journal entries
+   - `fin report cashflow` for income vs. expense summaries
+   - `fin export beancount` for interoperability
 - Pydantic-powered configuration via `.env`
 - Rich logging with structured errors
 - Tests, linting, and typing wired in (`pytest`, `ruff`, `mypy`)

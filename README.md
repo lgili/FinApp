@@ -37,7 +37,10 @@ Options:
 Commands:
   accounts  Account management commands
   config    Display effective configuration values
+  export    Export data to external formats
   init-db   Create the SQLite database and apply migrations
+  report    Reporting commands
+  txn       Transaction commands
 ```
 
 ## Next steps
