@@ -1,5 +1,6 @@
 """Get Account Balance Use Case."""
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -61,22 +62,50 @@ class GetAccountBalanceUseCase:
             return self._to_dto(account)
 
     def _to_dto(self, account: Account) -> AccountDTO:
-        """Convert domain entity to DTO.
+        """Convert domain entity to DTO with calculated balance.
 
         Args:
             account: Domain account entity
 
         Returns:
-            Account DTO
+            Account DTO with balance calculated from all transactions
         """
+        # Calculate balance by summing all postings for this account
+        balance = self._calculate_balance(account.id)
+        
         return AccountDTO(
             id=account.id,
             code=account.name,  # Using name as code
             name=account.name,
             type=account.account_type.name,
             currency=account.currency,
-            balance=Decimal("0"),  # TODO: Calculate balance from transactions
+            balance=balance,
             parent_code=None,  # TODO: Resolve from parent_id
             is_placeholder=False,  # TODO: Add to Account entity
             tags=(),  # TODO: Add to Account entity
         )
+
+    def _calculate_balance(self, account_id: UUID) -> Decimal:
+        """Calculate account balance from all transactions.
+
+        Args:
+            account_id: Account UUID
+
+        Returns:
+            Current balance (sum of all postings)
+        """
+        # Get all transactions for this account (no date limit)
+        transactions = self._uow.transactions.find_by_date_range(
+            start_date=date(1900, 1, 1),  # Far past
+            end_date=date(2100, 12, 31),  # Far future
+            account_id=account_id,
+        )
+        
+        # Sum all postings for this account
+        total = Decimal("0")
+        for transaction in transactions:
+            for posting in transaction.postings:
+                if posting.account_id == account_id:
+                    total += posting.amount.amount  # Money.amount is Decimal
+        
+        return total

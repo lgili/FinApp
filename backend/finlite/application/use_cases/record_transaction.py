@@ -85,11 +85,11 @@ class RecordTransactionUseCase:
             )
 
             # Persist transaction
-            saved_transaction = self._uow.transactions.add(transaction)
+            self._uow.transactions.add(transaction)
             self._uow.commit()
 
             # Convert to DTO
-            transaction_dto = self._to_dto(saved_transaction, account_map)
+            transaction_dto = self._to_dto(transaction, account_map)
 
             return RecordTransactionResult(
                 transaction=transaction_dto,
