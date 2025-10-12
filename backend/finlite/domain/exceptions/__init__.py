@@ -16,10 +16,14 @@ from finlite.domain.exceptions._exceptions import (
     ValidationError,
 )
 
+# Alias for consistency with use case naming
+AccountAlreadyExistsError = DuplicateAccountError
+
 __all__ = [
     "DomainException",
     "AccountException",
     "DuplicateAccountError",
+    "AccountAlreadyExistsError",  # Alias
     "InvalidAccountTypeError",
     "AccountNotFoundError",
     "TransactionException",

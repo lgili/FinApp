@@ -15,9 +15,11 @@ Exports:
 from finlite.domain.repositories.account_repository import IAccountRepository
 from finlite.domain.repositories.import_batch_repository import IImportBatchRepository
 from finlite.domain.repositories.transaction_repository import ITransactionRepository
+from finlite.infrastructure.persistence.unit_of_work import IUnitOfWork
 
 __all__ = [
     "IAccountRepository",
     "ITransactionRepository",
     "IImportBatchRepository",
+    "IUnitOfWork",
 ]
