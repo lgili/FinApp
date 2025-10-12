@@ -109,6 +109,33 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             return None
         return AccountMapper.to_entity(model)
 
+    def find_by_code(self, code: str) -> Optional[Account]:
+        """
+        Busca conta por código único.
+
+        Args:
+            code: Código único da conta (ex: "ASSET001" ou "Assets:Checking")
+
+        Returns:
+            Account entity ou None se não encontrado
+
+        Note:
+            No modelo ORM, o 'code' do domínio é mapeado para 'name' no banco.
+            Este método usa 'name' internamente.
+
+        Examples:
+            >>> account = repo.find_by_code("ASSET001")
+            >>> if account:
+            ...     print(account.name)
+        """
+        # No ORM, o 'code' do domínio é armazenado como 'name'
+        stmt = select(AccountModel).where(AccountModel.name == code)
+        model = self._session.scalar(stmt)
+
+        if model is None:
+            return None
+        return AccountMapper.to_entity(model)
+
     def find_by_type(self, account_type: AccountType) -> list[Account]:
         """
         Busca todas as contas de um tipo.

@@ -82,6 +82,24 @@ class IAccountRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_code(self, code: str) -> Optional[Account]:
+        """
+        Busca conta por código único.
+
+        Args:
+            code: Código único da conta (ex: "ASSET001" ou "Assets:Checking")
+
+        Returns:
+            Conta encontrada ou None
+
+        Examples:
+            >>> account = repo.find_by_code("ASSET001")
+            >>> if account:
+            ...     print(account.name)
+        """
+        pass
+
+    @abstractmethod
     def find_by_type(self, account_type: AccountType) -> list[Account]:
         """
         Busca todas as contas de determinado tipo.

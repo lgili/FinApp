@@ -67,11 +67,11 @@ class CreateAccountUseCase:
             )
 
             # Persist
-            saved_account = self._uow.accounts.add(account)
+            self._uow.accounts.add(account)
             self._uow.commit()
 
             # Convert to DTO
-            account_dto = self._to_dto(saved_account)
+            account_dto = self._to_dto(account)
 
             return CreateAccountResult(account=account_dto, created=True)
 
