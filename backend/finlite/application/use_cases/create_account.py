@@ -2,10 +2,12 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 
 from finlite.application.dtos import AccountDTO, CreateAccountDTO
 from finlite.domain.entities import Account
+from finlite.domain.events import AccountCreated
 from finlite.domain.exceptions import AccountAlreadyExistsError
 from finlite.domain.repositories import IUnitOfWork
 from finlite.domain.value_objects import AccountType
@@ -26,16 +28,19 @@ class CreateAccountUseCase:
     1. Validates that account doesn't already exist
     2. Creates the account entity
     3. Persists it using the repository
-    4. Returns the created account DTO
+    4. Publishes AccountCreated event
+    5. Returns the created account DTO
     """
 
-    def __init__(self, uow: IUnitOfWork) -> None:
-        """Initialize use case with unit of work.
+    def __init__(self, uow: IUnitOfWork, event_bus=None) -> None:
+        """Initialize use case with unit of work and optional event bus.
 
         Args:
             uow: Unit of work for transaction management
+            event_bus: Optional event bus for publishing domain events
         """
         self._uow = uow
+        self._event_bus = event_bus
 
     def execute(self, dto: CreateAccountDTO) -> CreateAccountResult:
         """Execute the use case.
@@ -69,6 +74,16 @@ class CreateAccountUseCase:
             # Persist
             self._uow.accounts.add(account)
             self._uow.commit()
+
+            # Publish domain event
+            if self._event_bus:
+                event = AccountCreated(
+                    account_id=account.id,
+                    account_code=account.name,
+                    account_type=account.account_type.name,
+                    currency=account.currency,
+                )
+                self._event_bus.publish(event)
 
             # Convert to DTO
             account_dto = self._to_dto(account)

@@ -35,6 +35,7 @@ from finlite.infrastructure.persistence.sqlalchemy.repositories import (
 from finlite.infrastructure.persistence.sqlalchemy.unit_of_work import (
     SqlAlchemyUnitOfWork,
 )
+from finlite.infrastructure.events import InMemoryEventBus, AuditLogHandler
 from finlite.application.use_cases import (
     CreateAccountUseCase,
     RecordTransactionUseCase,
@@ -129,17 +130,31 @@ class Container(containers.DeclarativeContainer):
     )
 
     # =========================================================================
+    # Event Bus & Handlers
+    # =========================================================================
+
+    event_bus = providers.Singleton(
+        InMemoryEventBus,
+    )
+
+    audit_log_handler = providers.Singleton(
+        AuditLogHandler,
+    )
+
+    # =========================================================================
     # Use Cases
     # =========================================================================
 
     create_account_use_case = providers.Factory(
         CreateAccountUseCase,
         uow=unit_of_work,
+        event_bus=event_bus,
     )
 
     record_transaction_use_case = providers.Factory(
         RecordTransactionUseCase,
         uow=unit_of_work,
+        event_bus=event_bus,
     )
 
     list_accounts_use_case = providers.Factory(
@@ -183,7 +198,28 @@ def create_container(database_url: str = "sqlite:///finlite.db", echo: bool = Fa
     container = Container()
     container.config.database.url.from_value(database_url)
     container.config.database.echo.from_value(echo)
+    
+    # Setup event bus with handlers
+    _setup_event_bus(container)
+    
     return container
+
+
+def _setup_event_bus(container: Container) -> None:
+    """
+    Configure event bus with default handlers.
+    
+    Args:
+        container: Container with event bus and handlers
+    """
+    from finlite.domain.events import AccountCreated, TransactionRecorded
+    
+    event_bus = container.event_bus()
+    audit_handler = container.audit_log_handler()
+    
+    # Subscribe audit handler to all domain events
+    event_bus.subscribe(AccountCreated, audit_handler.handle)
+    event_bus.subscribe(TransactionRecorded, audit_handler.handle)
 
 
 def init_database(container: Container) -> None:

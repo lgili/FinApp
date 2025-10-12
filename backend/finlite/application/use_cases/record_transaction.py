@@ -1,10 +1,12 @@
 """Record Transaction Use Case."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from finlite.application.dtos import CreateTransactionDTO, TransactionDTO, PostingDTO
 from finlite.domain.entities import Transaction
+from finlite.domain.events import TransactionRecorded
 from finlite.domain.exceptions import AccountNotFoundError, UnbalancedTransactionError
 from finlite.domain.repositories import IUnitOfWork
 from finlite.domain.value_objects import Posting, Money
@@ -26,15 +28,18 @@ class RecordTransactionUseCase:
     2. Validates transaction is balanced
     3. Creates transaction entity with postings
     4. Persists transaction
+    5. Publishes TransactionRecorded event
     """
 
-    def __init__(self, uow: IUnitOfWork) -> None:
-        """Initialize use case with unit of work.
+    def __init__(self, uow: IUnitOfWork, event_bus=None) -> None:
+        """Initialize use case with unit of work and optional event bus.
 
         Args:
             uow: Unit of work for transaction management
+            event_bus: Optional event bus for publishing domain events
         """
         self._uow = uow
+        self._event_bus = event_bus
 
     def execute(self, dto: CreateTransactionDTO) -> RecordTransactionResult:
         """Execute the use case.
@@ -87,6 +92,22 @@ class RecordTransactionUseCase:
             # Persist transaction
             self._uow.transactions.add(transaction)
             self._uow.commit()
+
+            # Publish domain event
+            if self._event_bus:
+                # Calculate total amount for event
+                total_amount = sum(p.amount.amount for p in transaction.postings)
+                affected_account_ids = tuple(p.account_id for p in transaction.postings)
+                
+                event = TransactionRecorded(
+                    transaction_id=transaction.id,
+                    transaction_date=transaction.date,
+                    description=transaction.description,
+                    total_amount=total_amount,
+                    posting_count=len(transaction.postings),
+                    affected_accounts=affected_account_ids,
+                )
+                self._event_bus.publish(event)
 
             # Convert to DTO
             transaction_dto = self._to_dto(transaction, account_map)
