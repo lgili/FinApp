@@ -44,6 +44,7 @@ class TestGetAccountBalanceUseCase:
         """Test successfully getting account balance by code."""
         # Arrange
         mock_uow.accounts.find_by_code.return_value = sample_account
+        mock_uow.transactions.find_by_date_range.return_value = []  # No transactions
 
         # Act
         result = use_case.execute_by_code("Assets:Checking")
@@ -54,6 +55,7 @@ class TestGetAccountBalanceUseCase:
         assert result.type == "ASSET"
         assert result.currency == "USD"
         assert isinstance(result.balance, Decimal)
+        assert result.balance == Decimal("0")  # No transactions
         mock_uow.accounts.find_by_code.assert_called_once_with("Assets:Checking")
 
     def test_get_account_balance_by_code_not_found(self, use_case, mock_uow):
@@ -75,6 +77,7 @@ class TestGetAccountBalanceUseCase:
         # Arrange
         account_id = sample_account.id
         mock_uow.accounts.get.return_value = sample_account
+        mock_uow.transactions.find_by_date_range.return_value = []  # No transactions
 
         # Act
         result = use_case.execute_by_id(account_id)
@@ -84,6 +87,7 @@ class TestGetAccountBalanceUseCase:
         assert result.code == "Assets:Checking"
         assert result.type == "ASSET"
         assert result.currency == "USD"
+        assert result.balance == Decimal("0")  # No transactions = 0 balance
         mock_uow.accounts.get.assert_called_once_with(account_id)
 
     def test_get_account_balance_dto_structure(
@@ -92,6 +96,7 @@ class TestGetAccountBalanceUseCase:
         """Test that returned DTO has correct structure."""
         # Arrange
         mock_uow.accounts.find_by_code.return_value = sample_account
+        mock_uow.transactions.find_by_date_range.return_value = []  # No transactions
 
         # Act
         result = use_case.execute_by_code("Assets:Checking")
@@ -126,6 +131,7 @@ class TestGetAccountBalanceUseCase:
                 is_active=True,
             )
             mock_uow.accounts.find_by_code.return_value = account
+            mock_uow.transactions.find_by_date_range.return_value = []  # No transactions
 
             # Act
             result = use_case.execute_by_code(code)
@@ -148,6 +154,7 @@ class TestGetAccountBalanceUseCase:
                 is_active=True,
             )
             mock_uow.accounts.find_by_code.return_value = account
+            mock_uow.transactions.find_by_date_range.return_value = []  # No transactions
 
             # Act
             result = use_case.execute_by_code(f"Assets:{currency}Account")
