@@ -1,43 +1,21 @@
+"""
+Configuração global de testes - Nova Arquitetura.
+
+Este conftest.py será expandido gradualmente conforme
+migramos fixtures do conftest legado.
+
+Por enquanto, fornece fixtures básicas para testes unitários puros.
+
+TODO:
+- Migrar fixtures do tests_legacy/conftest.py quando necessário
+- Adicionar fixtures de repository mocks para testes de aplicação
+- Adicionar fixtures de in-memory SQLite para testes de integração
+"""
+
 from __future__ import annotations
 
-from collections.abc import Iterator
-from pathlib import Path
-
 import pytest
-from sqlalchemy.orm import Session
-
-from finlite import config as config_module
-from finlite.config import Settings
-from finlite.core.accounts import seed_default_chart
-from finlite.db import session as session_module
-from finlite.db.migrator import upgrade_head
 
 
-@pytest.fixture()
-def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]:
-    data_dir = tmp_path / "finlite-data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("FINLITE_DATA_DIR", str(data_dir))
-    config_module.get_settings.cache_clear()
-    settings_obj = config_module.get_settings()
-
-    session_module.reset_engine()
-    upgrade_head(settings_obj)
-
-    yield settings_obj
-
-    session_module.reset_engine()
-    config_module.get_settings.cache_clear()
-    monkeypatch.delenv("FINLITE_DATA_DIR", raising=False)
-
-
-@pytest.fixture()
-def session(settings: Settings) -> Iterator[Session]:
-    with session_module.session_scope(settings) as db_session:
-        yield db_session
-
-
-@pytest.fixture()
-def seeded_session(session: Session) -> Iterator[Session]:
-    seed_default_chart(session)
-    yield session
+# Por enquanto, sem fixtures.
+# Fixtures serão adicionadas conforme migramos código.

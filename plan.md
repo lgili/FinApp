@@ -349,3 +349,143 @@ Duração estimada (referência)
 	•	F0: 0.5 sem | F1: 1 | F2: 1 | F2A: 0.5–1 | F2B: 1 | F3: 1 | F4: 1 | F5: 1 |
 	•	F6–F7: 4 | F8: 1 | F9: 1 | F10: 1 | F11: 2–3 (opcional)
 
+
+
+
+------------
+perfeito — dá sim pra deixar a CLI “turbinada” com uma LLM debaixo do capô usando Pydantic AI (o framework “agents” do Pydantic) e o clai (CLI oficial deles). A chave é: saída estruturada com validação Pydantic → converte linguagem natural em intents tipadas e executa tools com segurança (dry-run/preview).
+
+Abaixo vai um desenho objetivo pra integrar isso no teu app.
+
+O que usar
+	•	Pydantic AI (agents) para orquestrar a LLM e tipar intenções/saídas.  ￼
+	•	clai (CLI oficial) — ótimo pra depurar agentes no terminal e até rodar agentes customizados com --agent.  ￼
+	•	(Opcional) Instructor ou Guardrails se quiser reforçar ainda mais a validação de JSON estruturado; ambos funcionam com Pydantic.  ￼
+	•	(Opcional) TypeChat (ideia similar em TS/.NET) caso queira comparar o padrão “schema-first”.  ￼
+
+Arquitetura NL → Ação (segura)
+	1.	Schema das intents (Pydantic)
+Defina modelos como:
+	•	ImportFileIntent(source: Literal["nubank","ofx"], path: str, account: str, auto: bool)
+	•	ReportCashflowIntent(month: date | None, from_: date | None, to: date | None, category: str | None)
+	•	PostPendingIntent(auto: bool)
+	2.	Agente com tools (funções reais da tua CLI):
+	•	import_nubank(path, account), rules_apply(auto), post_pending(auto), report_cashflow(...).
+Cada tool tem assinatura clara + docstring; o agente chama tool → você valida e executa.
+	3.	Validação + preview
+	•	LLM gera apenas um dos modelos Pydantic (intenção).
+	•	Mostre um preview determinístico (comando equivalente) e peça confirmação para ações que escrevem no DB.
+	4.	Fallback & guardrails
+	•	Se a saída não validar, peça reformulação automática (loop curto).
+	•	Para intents perigosas, exija --confirm ou digitar “yes”.
+
+Fluxo de uso
+	•	fin ask "importe ./extrato.csv do nubank e lança tudo"
+→ valida ImportFileIntent + PostPendingIntent(auto=True) → preview:
+
+fin import nubank ./extrato.csv --account "Assets:Bank:Nubank"
+fin rules-apply --auto
+fin post pending --auto
+
+→ confirma → executa.
+
+	•	fin ask "quanto gastei com mercado em setembro?"
+→ ReportCashflowIntent(month=2025-09, category="Expenses:Groceries") → roda relatório (read-only).
+
+Esqueleto (conceito)
+
+# intents.py
+from pydantic import BaseModel, Field
+from typing import Literal, Union, Optional
+from datetime import date
+
+class ImportFileIntent(BaseModel):
+    kind: Literal["import_file"] = "import_file"
+    source: Literal["nubank","ofx"]
+    path: str
+    account: str
+    auto: bool = True
+
+class ReportCashflowIntent(BaseModel):
+    kind: Literal["report_cashflow"] = "report_cashflow"
+    month: Optional[str] = None
+    from_: Optional[str] = Field(default=None, alias="from")
+    to: Optional[str] = None
+    category: Optional[str] = None
+
+class PostPendingIntent(BaseModel):
+    kind: Literal["post_pending"] = "post_pending"
+    auto: bool = True
+
+Intent = Union[ImportFileIntent, ReportCashflowIntent, PostPendingIntent]
+
+# agent.py
+from pydantic_ai import Agent, ModelRetry  # agente pydantic
+from intents import Intent
+from typing import Annotated
+
+agent = Agent(
+    "openai:gpt-4o-mini",   # ou anthropic/llama.cpp compatível
+    instructions=(
+      "Você é um parser de comandos de finanças. "
+      "Retorne SOMENTE JSON válido que cumpra um dos modelos Pydantic chamados Intent. "
+      "Nunca execute nada, apenas emita a intenção."
+    ),
+    result_type=Intent,  # <- valida saída no Pydantic
+)
+
+# tools (expostos ao agente)
+@agent.tool
+def import_nubank(path: str, account: str) -> str:
+    "Importa extrato Nubank CSV e retorna batch id."
+    ...
+
+@agent.tool
+def report_cashflow(month: str|None=None, from_: str|None=None, to: str|None=None, category: str|None=None) -> str:
+    "Gera relatório e retorna caminho do CSV/MD."
+    ...
+
+@agent.tool
+def post_pending(auto: bool=True) -> str:
+    "Posta pendências."
+    ...
+
+# cli integration
+import typer
+from agent import agent
+from intents import Intent
+
+app = typer.Typer()
+
+@app.command()
+def ask(q: str, explain: bool=False, yes: bool=False):
+    result = agent.run(q)            # LLM -> Intent tipada (ou ModelRetry)
+    intent = result.data             # instancia Pydantic validada
+    cmd_preview = render_preview(intent)  # mostre os comandos equivalentes
+
+    print(cmd_preview)
+    if not yes and is_destructive(intent):
+        confirm = input("Executar? [y/N] ")
+        if confirm.lower() != "y":
+            raise SystemExit(0)
+    execute(intent)                  # chama as funções reais (tools)
+
+Observação: o clai também permite apontar para um agent customizado com --agent módulo:variável — ótimo pra debug durante o desenvolvimento.  ￼
+
+Como rodar 100% local (sem nuvem)
+	•	Use llama-cpp-python ou outro backend local compatível para o agent; se quiser reforçar JSON “na marra”, Instructor suporta structured output inclusive com modelos locais.  ￼
+	•	Mantenha regra > ML: para intents ultra-comuns, detecte por gramática regex primeiro e só chame LLM quando a frase for ambígua.
+
+Padrões de segurança (essenciais)
+	•	Dry-run obrigatório para ações de escrita; log e “undo” simples.
+	•	Whitelisting de tools: o agente só enxerga tools que você expuser.
+	•	Limites (tokens, tempo) e retries com validação Pydantic; se falhar 2x, caia para comandos determinísticos.
+	•	Auditoria: guarde prompt, intent json, preview, exec result no log.
+
+Roadmap curto para integrar
+	1.	Semana 1 — Criar intents Pydantic + fin ask com preview; gramáticas para 6 intents; fallback via agent.
+	2.	Semana 2 — Expor tools principais ao agent; --yes/--dry-run; logs/auditoria.
+	3.	Semana 3 — TUI: Command Palette chama fin ask; mostra preview e resultado em painel lateral.
+	4.	Semana 4 — Modelos locais + modo “offline only”; métricas de acurácia das intents.
+
+Se quiser, eu já escrevo o primeiro módulo intents + fin ask com preview e validação Pydantic, e deixo um agent de exemplo plugado no clai pra você testar no terminal.
