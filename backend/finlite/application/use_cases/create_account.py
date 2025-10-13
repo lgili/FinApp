@@ -11,6 +11,10 @@ from finlite.domain.events import AccountCreated
 from finlite.domain.exceptions import AccountAlreadyExistsError
 from finlite.domain.repositories import IUnitOfWork
 from finlite.domain.value_objects import AccountType
+from finlite.shared.observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -59,9 +63,16 @@ class CreateAccountUseCase:
             # Check if account already exists
             existing = self._uow.accounts.find_by_code(dto.code)
             if existing:
+                logger.warning(
+                    "account_creation_failed",
+                    reason="account_already_exists",
+                    account_code=dto.code,
+                )
                 raise AccountAlreadyExistsError(
                     f"Account with code '{dto.code}' already exists"
                 )
+
+            logger.info("creating_account", account_code=dto.code, account_type=dto.type)
 
             # Create domain entity
             account = Account.create(
@@ -74,6 +85,14 @@ class CreateAccountUseCase:
             # Persist
             self._uow.accounts.add(account)
             self._uow.commit()
+
+            logger.info(
+                "account_created",
+                account_id=str(account.id),
+                account_code=account.name,
+                account_type=account.account_type.name,
+                currency=account.currency,
+            )
 
             # Publish domain event
             if self._event_bus:

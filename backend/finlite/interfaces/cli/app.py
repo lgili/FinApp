@@ -21,8 +21,10 @@ from rich.console import Console
 from rich.table import Table
 
 from finlite.shared.di import Container, create_container, init_database
+from finlite.shared.observability import setup_logging, get_logger
 
-# Initialize console for rich output
+# Initialize logging and console
+logger = get_logger(__name__)
 console = Console()
 
 # Create Typer app
@@ -82,18 +84,34 @@ def main_callback(
         Optional[bool],
         typer.Option("--version", "-v", help="Show version and exit"),
     ] = None,
+    debug: Annotated[
+        bool,
+        typer.Option("--debug", help="Enable debug logging"),
+    ] = False,
+    json_logs: Annotated[
+        bool,
+        typer.Option("--json-logs", help="Output logs as JSON"),
+    ] = False,
 ):
     """
     Finlite CLI - Local-first accounting toolkit.
     
-    Built with Clean Architecture principles:
-    - Domain-driven design
-    - Use Cases for business logic
-    - Dependency Injection
-    - Repository pattern
+    Commands:
+        accounts     - Manage accounts
+        transactions - Manage transactions
+    
+    Global Options:
+        --debug      - Enable debug logging
+        --json-logs  - Output logs as JSON (useful for log aggregation)
     """
+    # Setup logging based on options
+    log_level = "DEBUG" if debug else "INFO"
+    setup_logging(debug=debug, json_output=json_logs, log_level=log_level)
+    
+    logger.debug("cli_started", command=ctx.invoked_subcommand)
+    
     if version:
-        console.print("Finlite v0.3.0")
+        console.print("finlite version 0.2.0")
         raise typer.Exit()
 
 

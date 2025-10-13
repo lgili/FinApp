@@ -10,6 +10,10 @@ from finlite.domain.events import TransactionRecorded
 from finlite.domain.exceptions import AccountNotFoundError, UnbalancedTransactionError
 from finlite.domain.repositories import IUnitOfWork
 from finlite.domain.value_objects import Posting, Money
+from finlite.shared.observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -56,11 +60,23 @@ class RecordTransactionUseCase:
             ValueError: If transaction data is invalid
         """
         with self._uow:
+            logger.info(
+                "recording_transaction",
+                description=dto.description,
+                date=str(dto.date),
+                posting_count=len(dto.postings),
+            )
+            
             # Validate all accounts exist and build account_id map
             account_map = {}  # code -> account
             for posting_dto in dto.postings:
                 account = self._uow.accounts.find_by_code(posting_dto.account_code)
                 if not account:
+                    logger.error(
+                        "account_not_found",
+                        account_code=posting_dto.account_code,
+                        transaction_description=dto.description,
+                    )
                     raise AccountNotFoundError(
                         f"Account '{posting_dto.account_code}' not found"
                     )
@@ -92,6 +108,14 @@ class RecordTransactionUseCase:
             # Persist transaction
             self._uow.transactions.add(transaction)
             self._uow.commit()
+
+            logger.info(
+                "transaction_recorded",
+                transaction_id=str(transaction.id),
+                description=transaction.description,
+                date=str(transaction.date),
+                posting_count=len(transaction.postings),
+            )
 
             # Publish domain event
             if self._event_bus:

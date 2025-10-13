@@ -5,15 +5,15 @@ caching updates, etc.
 """
 
 import json
-import structlog
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 from finlite.domain.events import DomainEvent
+from finlite.shared.observability import get_logger
 
 
 # Initialize structured logger
-logger = structlog.get_logger()
+logger = get_logger(__name__)
 
 
 class EventHandler(ABC):
