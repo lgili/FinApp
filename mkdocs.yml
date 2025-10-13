@@ -1,0 +1,121 @@
+site_name: Finlite
+site_description: Local-first personal finance toolkit with double-entry accounting
+site_author: Finlite Contributors
+site_url: https://lgili.github.io/finapp/
+
+repo_name: lgili/finapp
+repo_url: https://github.com/lgili/finapp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+plugins:
+  - search:
+      lang: en
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/lgili/finapp
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - First Steps: getting-started/first-steps.md
+  - User Guide:
+      - CLI Reference: user-guide/cli-reference.md
+      - Account Management: user-guide/accounts.md
+      - Transactions: user-guide/transactions.md
+      - Double-Entry Accounting: user-guide/double-entry.md
+      - Logging & Debugging: user-guide/logging.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Clean Architecture: architecture/clean-architecture.md
+      - Domain Layer: architecture/domain.md
+      - Application Layer: architecture/application.md
+      - Infrastructure Layer: architecture/infrastructure.md
+      - Event Bus: architecture/event-bus.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Project Structure: development/project-structure.md
+      - Testing: development/testing.md
+      - Code Style: development/code-style.md
+  - API Reference:
+      - Use Cases: api/use-cases.md
+      - Repositories: api/repositories.md
+      - Domain Events: api/events.md
+  - Roadmap: roadmap.md
+  - Changelog: changelog.md

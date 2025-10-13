@@ -13,7 +13,7 @@ var/
 .pytest_cache/
 .ruff_cache/
 ruff_cache/
-
+site/
 # IDE
 .vscode/
 .idea/
