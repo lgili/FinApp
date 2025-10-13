@@ -11,4 +11,13 @@ venv/
 var/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Test databases
+finlite.db
+test_*.db
