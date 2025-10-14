@@ -5,21 +5,29 @@ O mapper é responsável por traduzir entre:
 - Domain Entity (Account) ←→ ORM Model (AccountModel)
 
 Garante que o domain permanece puro (sem dependências de SQLAlchemy).
+
+Note: Handles UUID (domain) ↔ Integer (database) conversion.
 """
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from finlite.domain.entities.account import Account
 from finlite.domain.value_objects.account_type import AccountType
-from finlite.infrastructure.persistence.sqlalchemy.models import (
-    AccountModel,
-    AccountTypeEnum,
+from finlite.infrastructure.persistence.sqlalchemy.models import AccountModel
+from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import (
+    uuid_to_int,
+    int_to_uuid,
 )
 
 
 class AccountMapper:
     """
     Mapper bidirectional para Account ←→ AccountModel.
+    
+    Converts between UUID (domain) and Integer (database) IDs.
+    Stores UUID in 'code' column for full recovery.
 
     Examples:
         >>> # Domain → ORM
@@ -31,68 +39,89 @@ class AccountMapper:
     """
 
     @staticmethod
-    def to_model(account: Account) -> AccountModel:
+    def to_model(account: Account, for_update: bool = False) -> AccountModel:
         """
         Converte Domain Account para ORM AccountModel.
 
         Args:
             account: Entity do domínio
+            for_update: Se True, inclui o ID (para updates). Se False, omite o ID (para inserts).
 
         Returns:
             ORM model pronto para persistir
 
         Examples:
-            >>> account = Account.create(
-            ...     name="Assets:Checking",
-            ...     account_type=AccountType.ASSET,
-            ...     currency="BRL"
-            ... )
+            >>> # Novo account (insert) - não passa ID
+            >>> account = Account.create("Assets:Checking", AccountType.ASSET, "BRL")
             >>> model = AccountMapper.to_model(account)
-            >>> model.name
-            'Assets:Checking'
+            >>> 
+            >>> # Update account existente
+            >>> model = AccountMapper.to_model(account, for_update=True)
         """
-        return AccountModel(
-            id=account.id,
-            name=account.name,
-            account_type=AccountMapper._domain_type_to_orm(account.account_type),
-            currency=account.currency,
-            parent_id=account.parent_id,
-            is_active=account.is_active,
-            created_at=account.created_at,
-            updated_at=account.updated_at,
-        )
+        model_data = {
+            "name": account.name,
+            "code": str(account.id),  # Store UUID in code column
+            "type": account.account_type.value,
+            "currency": account.currency,
+            "parent_id": account.parent_id,  # Repository handles UUID→Integer conversion
+            "is_archived": not account.is_active,
+            "created_at": account.created_at,
+            "updated_at": account.updated_at,
+        }
+        
+        # Para updates, incluir o ID convertido de UUID
+        if for_update and account.id:
+            # Extrair integer ID do UUID se possível
+            # Assumimos que UUIDs foram gerados a partir de Integer IDs
+            model_data["id"] = AccountMapper._uuid_to_int(account.id)
+        
+        return AccountModel(**model_data)
 
     @staticmethod
-    def to_entity(model: AccountModel) -> Account:
+    def to_entity(model: AccountModel, parent_model: AccountModel | None = None) -> Account:
         """
         Converte ORM AccountModel para Domain Account.
 
         Args:
             model: ORM model do banco
+            parent_model: ORM model do parent (opcional, para preservar UUID correto)
 
         Returns:
             Entity do domínio
 
         Examples:
-            >>> model = AccountModel(
-            ...     id=uuid4(),
-            ...     name="Assets:Checking",
-            ...     account_type=AccountTypeEnum.ASSET,
-            ...     currency="BRL",
-            ...     created_at=datetime.utcnow(),
-            ...     updated_at=datetime.utcnow()
-            ... )
+            >>> model = AccountModel(id=1, name="Assets:Checking", ...)
             >>> account = AccountMapper.to_entity(model)
             >>> account.name
             'Assets:Checking'
         """
+        # If code contains a UUID, use it; otherwise generate from integer ID
+        if model.code:
+            try:
+                account_id = UUID(model.code)
+            except (ValueError, AttributeError):
+                account_id = int_to_uuid(model.id)
+        else:
+            account_id = int_to_uuid(model.id)
+        
+        # For parent_id: if parent_model provided, use its UUID from code
+        if parent_model:
+            try:
+                parent_id = UUID(parent_model.code) if parent_model.code else int_to_uuid(parent_model.id)
+            except (ValueError, AttributeError):
+                parent_id = int_to_uuid(parent_model.id)
+        elif model.parent_id:
+            parent_id = int_to_uuid(model.parent_id)
+        else:
+            parent_id = None
+            
         return Account(
-            id=model.id,
+            id=account_id,
             name=model.name,
-            account_type=AccountMapper._orm_type_to_domain(model.account_type),
+            account_type=AccountType(model.type),
             currency=model.currency,
-            parent_id=model.parent_id,
-            is_active=model.is_active,
+            parent_id=parent_id,
+            is_active=not model.is_archived,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -115,32 +144,9 @@ class AccountMapper:
             >>> session.commit()
         """
         model.name = account.name
-        model.account_type = AccountMapper._domain_type_to_orm(account.account_type)
+        model.code = str(account.id)
+        model.type = account.account_type.value
         model.currency = account.currency
         model.parent_id = account.parent_id
-        model.is_active = account.is_active
+        model.is_archived = not account.is_active
         model.updated_at = account.updated_at
-
-    @staticmethod
-    def _domain_type_to_orm(domain_type: AccountType) -> AccountTypeEnum:
-        """Converte AccountType (domain) para AccountTypeEnum (ORM)."""
-        mapping = {
-            AccountType.ASSET: AccountTypeEnum.ASSET,
-            AccountType.LIABILITY: AccountTypeEnum.LIABILITY,
-            AccountType.EQUITY: AccountTypeEnum.EQUITY,
-            AccountType.INCOME: AccountTypeEnum.INCOME,
-            AccountType.EXPENSE: AccountTypeEnum.EXPENSE,
-        }
-        return mapping[domain_type]
-
-    @staticmethod
-    def _orm_type_to_domain(orm_type: AccountTypeEnum) -> AccountType:
-        """Converte AccountTypeEnum (ORM) para AccountType (domain)."""
-        mapping = {
-            AccountTypeEnum.ASSET: AccountType.ASSET,
-            AccountTypeEnum.LIABILITY: AccountType.LIABILITY,
-            AccountTypeEnum.EQUITY: AccountType.EQUITY,
-            AccountTypeEnum.INCOME: AccountType.INCOME,
-            AccountTypeEnum.EXPENSE: AccountType.EXPENSE,
-        }
-        return mapping[orm_type]

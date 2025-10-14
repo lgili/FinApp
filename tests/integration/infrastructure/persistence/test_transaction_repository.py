@@ -106,11 +106,11 @@ class TestSqlAlchemyTransactionRepository:
             uow_with_transactions.commit()
         
         # Assert - Query directly from DB
-        db_transaction = session.query(TransactionModel).filter_by(id=transaction.id).first()
+        db_transaction = session.query(TransactionModel).filter_by(reference=str(transaction.id)).first()
         assert db_transaction is not None
         assert db_transaction.description == "Lunch at restaurant"
         assert len(db_transaction.postings) == 2
-        assert db_transaction.date == date(2025, 10, 15)
+        assert db_transaction.occurred_at.date() == date(2025, 10, 15)
     
     def test_get_transaction_retrieves_with_postings(self, uow_with_transactions, sample_accounts):
         """Test that getting a transaction includes all postings."""

@@ -1,0 +1,20 @@
+date,category,title,amount
+2025-10-01,transaction,Padaria do Zé,15.50
+2025-10-01,transaction,Uber,25.30
+2025-10-02,transaction,Supermercado Carrefour,156.78
+2025-10-03,transaction,Farmácia Drogasil,42.90
+2025-10-03,transaction,Netflix,45.90
+2025-10-04,transaction,Restaurante Outback,89.00
+2025-10-05,transaction,Gasolina Shell,200.00
+2025-10-05,transaction,Uber,18.50
+2025-10-06,transaction,Mercadinho,34.20
+2025-10-07,transaction,Livraria Cultura,67.50
+2025-10-08,transaction,Cinema,55.00
+2025-10-08,transaction,Starbucks,28.90
+2025-10-09,transaction,iFood,45.60
+2025-10-10,transaction,Uber,22.00
+2025-10-10,transaction,Academia,120.00
+2025-10-11,transaction,Spotify,21.90
+2025-10-11,transaction,Açougue,85.30
+2025-10-12,transaction,Amazon,234.90
+2025-10-13,transaction,Uber Eats,52.40

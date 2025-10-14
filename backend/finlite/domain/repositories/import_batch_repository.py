@@ -87,6 +87,21 @@ class IImportBatchRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_sha256(self, file_sha256: str) -> Optional[ImportBatch]:
+        """
+        Busca lote por hash SHA256 do arquivo.
+
+        Útil para evitar duplicatas (mesmo arquivo renomeado).
+
+        Args:
+            file_sha256: Hash SHA256 do arquivo
+
+        Returns:
+            Lote encontrado ou None
+        """
+        pass
+
+    @abstractmethod
     def find_by_status(self, status: ImportStatus) -> list[ImportBatch]:
         """
         Busca lotes por status.

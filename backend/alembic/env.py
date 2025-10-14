@@ -5,9 +5,9 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import create_engine, pool
 from finlite.config import get_settings
-from finlite.db.models import Base
-from finlite.db.session import get_engine
+from finlite.infrastructure.persistence.sqlalchemy.models import Base
 
 config = context.config
 
@@ -28,7 +28,12 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     settings = get_settings()
-    connectable = get_engine(settings)
+    
+    # Create engine directly
+    connectable = create_engine(
+        settings.database_url,
+        poolclass=pool.NullPool,
+    )
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=TARGET_METADATA)

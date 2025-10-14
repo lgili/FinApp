@@ -37,10 +37,12 @@ app = typer.Typer(
 # Sub-apps for organization
 accounts_app = typer.Typer(help="Account management commands")
 transactions_app = typer.Typer(help="Transaction commands")
+import_app = typer.Typer(help="Import bank statements")
 
 # Register sub-apps
 app.add_typer(accounts_app, name="accounts")
 app.add_typer(transactions_app, name="transactions")
+app.add_typer(import_app, name="import")
 
 # Global container instance (initialized on first command)
 _container: Optional[Container] = None
@@ -72,9 +74,11 @@ def get_container() -> Container:
 # Import and register commands (must be after get_container definition)
 from finlite.interfaces.cli import accounts as accounts_module  # noqa: E402
 from finlite.interfaces.cli import transactions as transactions_module  # noqa: E402
+from finlite.interfaces.cli import imports as imports_module  # noqa: E402
 
 accounts_module.register_commands(accounts_app, get_container)
 transactions_module.register_commands(transactions_app, get_container)
+imports_module.register_commands(import_app, get_container)
 
 
 @app.callback()
@@ -99,6 +103,7 @@ def main_callback(
     Commands:
         accounts     - Manage accounts
         transactions - Manage transactions
+        import       - Import bank statements
     
     Global Options:
         --debug      - Enable debug logging

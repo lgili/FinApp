@@ -19,7 +19,7 @@ from finlite.domain.repositories.transaction_repository import ITransactionRepos
 from finlite.infrastructure.persistence.sqlalchemy.mappers.transaction_mapper import (
     TransactionMapper,
 )
-from finlite.infrastructure.persistence.sqlalchemy.models import TransactionModel
+from finlite.infrastructure.persistence.sqlalchemy.models import TransactionModel, PostingModel
 
 
 class SqlAlchemyTransactionRepository(ITransactionRepository):
@@ -62,8 +62,13 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
             >>> repo.add(transaction)
             >>> session.commit()
         """
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import int_to_uuid
+        
         model = TransactionMapper.to_model(transaction)
         self._session.add(model)
+        self._session.flush()  # Get the generated ID
+        # Update transaction with the generated ID (reconstructed from Integer)
+        transaction._id = int_to_uuid(model.id)
 
     def get(self, transaction_id: UUID) -> Transaction:
         """
@@ -86,9 +91,10 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         """
         from finlite.domain.exceptions import TransactionNotFoundError
 
+        # Try to find by reference (UUID stored as string)
         stmt = (
             select(TransactionModel)
-            .where(TransactionModel.id == transaction_id)
+            .where(TransactionModel.reference == str(transaction_id))
             .options(joinedload(TransactionModel.postings))
         )
         model = self._session.scalar(stmt)
@@ -119,13 +125,18 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
             >>> # Últimas 10 transações da conta
             >>> txs = repo.find_by_account(account_id, limit=10)
         """
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
+        
+        # Convert UUID to Integer ID
+        account_int_id = uuid_to_int(account_id)
+        
         # Query base: join com postings
         stmt = (
             select(TransactionModel)
             .join(TransactionModel.postings)
-            .where(TransactionModel.postings.any(account_id=account_id))
+            .where(PostingModel.account_id == account_int_id)
             .options(joinedload(TransactionModel.postings))
-            .order_by(TransactionModel.date.desc())
+            .order_by(TransactionModel.occurred_at.desc())
         )
 
         # Limite
@@ -169,8 +180,8 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         stmt = (
             select(TransactionModel)
             .where(
-                TransactionModel.date >= start_date,
-                TransactionModel.date <= end_date,
+                TransactionModel.occurred_at >= start_date,
+                TransactionModel.occurred_at <= end_date,
             )
             .options(joinedload(TransactionModel.postings))
         )
@@ -181,7 +192,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
                 TransactionModel.postings.any(account_id=account_id)
             )
 
-        stmt = stmt.order_by(TransactionModel.date.desc())
+        stmt = stmt.order_by(TransactionModel.occurred_at.desc())
 
         models = self._session.scalars(stmt).unique().all()
         return [TransactionMapper.to_entity(model) for model in models]
@@ -203,7 +214,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
             select(TransactionModel)
             .where(TransactionModel.import_batch_id == batch_id)
             .options(joinedload(TransactionModel.postings))
-            .order_by(TransactionModel.date)
+            .order_by(TransactionModel.occurred_at)
         )
 
         models = self._session.scalars(stmt).all()
@@ -245,7 +256,8 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         """
         from finlite.domain.exceptions import TransactionNotFoundError
 
-        model = self._session.get(TransactionModel, transaction_id)
+        # Find by reference (UUID stored as string)
+        model = self._session.query(TransactionModel).filter_by(reference=str(transaction_id)).first()
 
         if model is None:
             raise TransactionNotFoundError(transaction_id)
@@ -301,7 +313,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
                 )
             stmt = stmt.where(or_(*conditions))
 
-        stmt = stmt.order_by(TransactionModel.date.desc())
+        stmt = stmt.order_by(TransactionModel.occurred_at.desc())
 
         models = self._session.scalars(stmt).unique().all()
         return [TransactionMapper.to_entity(model) for model in models]
@@ -323,7 +335,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
             select(TransactionModel)
             .where(TransactionModel.description.ilike(f"%{query}%"))
             .options(joinedload(TransactionModel.postings))
-            .order_by(TransactionModel.date.desc())
+            .order_by(TransactionModel.occurred_at.desc())
         )
 
         models = self._session.scalars(stmt).unique().all()
@@ -357,11 +369,11 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
 
         # Ordenação
         if order_by == "date":
-            order_field = TransactionModel.date
+            order_field = TransactionModel.occurred_at
         elif order_by == "created_at":
             order_field = TransactionModel.created_at
         else:
-            order_field = TransactionModel.date
+            order_field = TransactionModel.occurred_at
 
         if descending:
             stmt = stmt.order_by(order_field.desc())
@@ -473,9 +485,9 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
 
         # Filtros de data
         if start_date:
-            stmt = stmt.where(TransactionModel.date >= start_date)
+            stmt = stmt.where(TransactionModel.occurred_at >= start_date)
         if end_date:
-            stmt = stmt.where(TransactionModel.date <= end_date)
+            stmt = stmt.where(TransactionModel.occurred_at <= end_date)
 
         # Filtro de conta (join com postings)
         if account_id:

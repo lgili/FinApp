@@ -19,6 +19,7 @@ from finlite.infrastructure.persistence.sqlalchemy.repositories.account_reposito
     SqlAlchemyAccountRepository
 )
 from finlite.infrastructure.persistence.sqlalchemy.models import AccountModel
+from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
 
 
 class TestSqlAlchemyAccountRepository:
@@ -39,10 +40,10 @@ class TestSqlAlchemyAccountRepository:
             uow.commit()
         
         # Assert - Query directly from DB to verify persistence
-        db_account = session.query(AccountModel).filter_by(id=account.id).first()
+        db_account = session.query(AccountModel).filter_by(name="Checking Account").first()
         assert db_account is not None
         assert db_account.name == "Checking Account"
-        assert db_account.account_type.value == "ASSET"
+        assert db_account.type == "ASSET"
         assert db_account.currency == "BRL"
     
     def test_get_account_retrieves_from_database(self, uow, session):
@@ -50,9 +51,10 @@ class TestSqlAlchemyAccountRepository:
         # Arrange - Insert directly into DB
         account_id = uuid4()
         db_account = AccountModel(
-            id=account_id,
+            id=uuid_to_int(account_id),
             name="Savings Account",
-            account_type="ASSET",
+            code=str(account_id),  # Store UUID in code column
+            type="ASSET",
             currency="BRL"
         )
         session.add(db_account)
@@ -139,7 +141,7 @@ class TestSqlAlchemyAccountRepository:
         
         # Mark one as inactive directly in DB
         db_account = session.query(AccountModel).filter_by(name="Account 2").first()
-        db_account.is_active = False
+        db_account.is_archived = True  # Mark as archived (inactive)
         session.commit()
         
         # Act

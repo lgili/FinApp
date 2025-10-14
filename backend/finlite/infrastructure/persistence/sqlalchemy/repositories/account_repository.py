@@ -62,8 +62,22 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> repo.add(account)
             >>> session.commit()
         """
-        model = AccountMapper.to_model(account)
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import int_to_uuid
+        
+        model = AccountMapper.to_model(account, for_update=False)
+        
+        # If account has parent_id UUID, convert to integer ID by querying the parent
+        if account.parent_id:
+            parent_model = self._session.query(AccountModel).filter_by(code=str(account.parent_id)).first()
+            if parent_model:
+                model.parent_id = parent_model.id
+            else:
+                model.parent_id = None
+            
         self._session.add(model)
+        self._session.flush()  # Get the generated ID
+        # Update account with the generated ID (reconstructed from Integer)
+        account._id = int_to_uuid(model.id)
 
     def get(self, account_id: UUID) -> Account:
         """
@@ -83,11 +97,15 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> print(account.name)
         """
         from finlite.domain.exceptions import AccountNotFoundError
+        from sqlalchemy.orm import joinedload
 
-        model = self._session.get(AccountModel, account_id)
+        # Try to find by code (UUID stored as string), eagerly load parent
+        model = self._session.query(AccountModel).options(joinedload(AccountModel.parent)).filter_by(code=str(account_id)).first()
         if model is None:
             raise AccountNotFoundError(account_id)
-        return AccountMapper.to_entity(model)
+        
+        # Pass parent_model to preserve correct UUID
+        return AccountMapper.to_entity(model, parent_model=model.parent if model.parent_id else None)
 
     def find_by_name(self, name: str) -> Optional[Account]:
         """
@@ -151,10 +169,10 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> for account in assets:
             ...     print(account.name)
         """
-        # Converte domain type para ORM enum
-        orm_type = AccountMapper._domain_type_to_orm(account_type)
+        # Convert domain type to string for database query
+        type_str = account_type.value
 
-        stmt = select(AccountModel).where(AccountModel.account_type == orm_type)
+        stmt = select(AccountModel).where(AccountModel.type == type_str)
         models = self._session.scalars(stmt).all()
 
         return [AccountMapper.to_entity(model) for model in models]
@@ -209,7 +227,7 @@ class SqlAlchemyAccountRepository(IAccountRepository):
         stmt = select(AccountModel)
 
         if not include_inactive:
-            stmt = stmt.where(AccountModel.is_active == True)  # noqa: E712
+            stmt = stmt.where(AccountModel.is_archived == False)  # noqa: E712
 
         stmt = stmt.order_by(AccountModel.name)
         models = self._session.scalars(stmt).all()
@@ -230,7 +248,7 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> if repo.exists(account_id):
             ...     print("Conta existe")
         """
-        stmt = select(AccountModel.id).where(AccountModel.id == account_id)
+        stmt = select(AccountModel.id).where(AccountModel.code == str(account_id))
         result = self._session.scalar(stmt)
         return result is not None
 
@@ -271,7 +289,7 @@ class SqlAlchemyAccountRepository(IAccountRepository):
         stmt = select(func.count(AccountModel.id))
 
         if not include_inactive:
-            stmt = stmt.where(AccountModel.is_active == True)  # noqa: E712
+            stmt = stmt.where(AccountModel.is_archived == False)  # noqa: E712
 
         return self._session.scalar(stmt) or 0
 
@@ -293,7 +311,7 @@ class SqlAlchemyAccountRepository(IAccountRepository):
         """
         from finlite.domain.exceptions import AccountNotFoundError
 
-        model = self._session.get(AccountModel, account.id)
+        model = self._session.query(AccountModel).filter_by(code=str(account.id)).first()
 
         if model is None:
             raise AccountNotFoundError(account.id)
@@ -317,7 +335,7 @@ class SqlAlchemyAccountRepository(IAccountRepository):
         """
         from finlite.domain.exceptions import AccountNotFoundError
 
-        model = self._session.get(AccountModel, account_id)
+        model = self._session.query(AccountModel).filter_by(code=str(account_id)).first()
 
         if model is None:
             raise AccountNotFoundError(account_id)

@@ -79,6 +79,7 @@ class ImportBatch:
         source: Fonte da importação (NUBANK_CSV, OFX, etc)
         status: Status atual (PENDING, COMPLETED, FAILED, REVERSED)
         filename: Nome do arquivo importado (opcional)
+        file_sha256: Hash SHA256 do arquivo (para deduplicação)
         transaction_count: Número de transações importadas
         metadata: Metadados adicionais (JSON-serializável)
         error_message: Mensagem de erro se falhou (opcional)
@@ -105,6 +106,7 @@ class ImportBatch:
     source: ImportSource
     status: ImportStatus
     filename: Optional[str] = None
+    file_sha256: Optional[str] = None
     transaction_count: int = 0
     metadata: dict = field(default_factory=dict)
     error_message: Optional[str] = None
@@ -122,6 +124,7 @@ class ImportBatch:
         cls,
         source: ImportSource,
         filename: Optional[str] = None,
+        file_sha256: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> ImportBatch:
         """
@@ -130,6 +133,7 @@ class ImportBatch:
         Args:
             source: Fonte da importação
             filename: Nome do arquivo (opcional)
+            file_sha256: Hash SHA256 do arquivo (opcional)
             metadata: Metadados adicionais (opcional)
 
         Returns:
@@ -139,6 +143,7 @@ class ImportBatch:
             >>> batch = ImportBatch.create(
             ...     source=ImportSource.NUBANK_CSV,
             ...     filename="nubank_2025-10.csv",
+            ...     file_sha256="abc123...",
             ...     metadata={"account": "Assets:Nubank", "year": 2025}
             ... )
             >>> batch.status
@@ -149,6 +154,7 @@ class ImportBatch:
             source=source,
             status=ImportStatus.PENDING,
             filename=filename,
+            file_sha256=file_sha256,
             metadata=metadata or {},
         )
 

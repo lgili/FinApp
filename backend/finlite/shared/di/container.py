@@ -26,10 +26,14 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from finlite.infrastructure.persistence.sqlalchemy.models import Base
 from finlite.infrastructure.persistence.sqlalchemy.mappers import (
     AccountMapper,
+    ImportBatchMapper,
+    StatementEntryMapper,
     TransactionMapper,
 )
 from finlite.infrastructure.persistence.sqlalchemy.repositories import (
     SqlAlchemyAccountRepository,
+    SqlAlchemyImportBatchRepository,
+    SqlAlchemyStatementEntryRepository,
     SqlAlchemyTransactionRepository,
 )
 from finlite.infrastructure.persistence.sqlalchemy.unit_of_work import (
@@ -42,6 +46,9 @@ from finlite.application.use_cases import (
     ListAccountsUseCase,
     GetAccountBalanceUseCase,
     ListTransactionsUseCase,
+)
+from finlite.application.use_cases.import_nubank_statement import (
+    ImportNubankStatement,
 )
 
 
@@ -104,6 +111,10 @@ class Container(containers.DeclarativeContainer):
 
     account_mapper = providers.Singleton(AccountMapper)
 
+    import_batch_mapper = providers.Singleton(ImportBatchMapper)
+
+    statement_entry_mapper = providers.Singleton(StatementEntryMapper)
+
     transaction_mapper = providers.Singleton(TransactionMapper)
 
     # =========================================================================
@@ -112,6 +123,16 @@ class Container(containers.DeclarativeContainer):
 
     account_repository = providers.Factory(
         SqlAlchemyAccountRepository,
+        session=session_factory,
+    )
+
+    import_batch_repository = providers.Factory(
+        SqlAlchemyImportBatchRepository,
+        session=session_factory,
+    )
+
+    statement_entry_repository = providers.Factory(
+        SqlAlchemyStatementEntryRepository,
         session=session_factory,
     )
 
@@ -172,6 +193,13 @@ class Container(containers.DeclarativeContainer):
         uow=unit_of_work,
     )
 
+    import_nubank_statement_use_case = providers.Factory(
+        ImportNubankStatement,
+        import_batch_repository=import_batch_repository,
+        statement_entry_repository=statement_entry_repository,
+        event_bus=event_bus,
+    )
+
 
 def create_container(database_url: str = "sqlite:///finlite.db", echo: bool = False) -> Container:
     """
@@ -213,6 +241,12 @@ def _setup_event_bus(container: Container) -> None:
         container: Container with event bus and handlers
     """
     from finlite.domain.events import AccountCreated, TransactionRecorded
+    from finlite.domain.events.statement_events import (
+        StatementImported,
+        StatementImportFailed,
+        StatementMatched,
+        StatementPosted,
+    )
     
     event_bus = container.event_bus()
     audit_handler = container.audit_log_handler()
@@ -220,6 +254,12 @@ def _setup_event_bus(container: Container) -> None:
     # Subscribe audit handler to all domain events
     event_bus.subscribe(AccountCreated, audit_handler.handle)
     event_bus.subscribe(TransactionRecorded, audit_handler.handle)
+    
+    # Subscribe to statement import events
+    event_bus.subscribe(StatementImported, audit_handler.handle)
+    event_bus.subscribe(StatementImportFailed, audit_handler.handle)
+    event_bus.subscribe(StatementMatched, audit_handler.handle)
+    event_bus.subscribe(StatementPosted, audit_handler.handle)
 
 
 def init_database(container: Container) -> None:

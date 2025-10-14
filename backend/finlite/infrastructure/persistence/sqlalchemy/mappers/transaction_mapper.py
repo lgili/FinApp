@@ -5,11 +5,15 @@ O mapper é responsável por traduzir entre:
 - Domain Entity (Transaction + Postings) ←→ ORM Models (TransactionModel + PostingModels)
 
 Este é um mapper mais complexo pois precisa lidar com o aggregate root.
+
+Note: Handles UUID (domain) ↔ Integer (database) conversion.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from finlite.domain.entities.transaction import Transaction
 from finlite.domain.value_objects.money import Money
@@ -17,6 +21,10 @@ from finlite.domain.value_objects.posting import Posting
 from finlite.infrastructure.persistence.sqlalchemy.models import (
     PostingModel,
     TransactionModel,
+)
+from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import (
+    uuid_to_int,
+    int_to_uuid,
 )
 
 
@@ -58,19 +66,20 @@ class TransactionMapper:
         """
         # Cria transaction model
         model = TransactionModel(
-            id=transaction.id,
-            date=transaction.date,
+            reference=str(transaction.id),  # Store UUID in reference column
+            occurred_at=transaction.date,  # date → datetime (stored as occurred_at in DB)
             description=transaction.description,
-            tags=list(transaction.tags),  # tuple → list para JSON
-            notes=transaction.notes,
-            import_batch_id=transaction.import_batch_id,
+            extra_data={
+                "tags": list(transaction.tags),
+                "notes": transaction.notes,
+                "import_batch_id": str(transaction.import_batch_id) if transaction.import_batch_id else None,
+            },
             created_at=transaction.created_at,
-            updated_at=transaction.updated_at,
         )
 
-        # Cria posting models
+        # Cria posting models  
         model.postings = [
-            TransactionMapper._posting_to_model(posting, transaction.id)
+            TransactionMapper._posting_to_model(posting, None)  # transaction_id will be set by relationship
             for posting in transaction.postings
         ]
 
@@ -99,17 +108,33 @@ class TransactionMapper:
             for posting_model in model.postings
         ]
 
+        # Extract UUID from reference or generate from integer ID
+        if model.reference:
+            try:
+                transaction_id = UUID(model.reference)
+            except (ValueError, TypeError):
+                transaction_id = int_to_uuid(model.id)
+        else:
+            transaction_id = int_to_uuid(model.id)
+
+        # Extract data from extra_data JSON
+        extra = model.extra_data or {}
+        tags = tuple(extra.get("tags", []))
+        notes = extra.get("notes")
+        import_batch_id_str = extra.get("import_batch_id")
+        import_batch_id = UUID(import_batch_id_str) if import_batch_id_str else None
+
         # Cria transaction entity
         return Transaction(
-            id=model.id,
-            date=model.date,  # Já é date (não datetime)
+            id=transaction_id,
+            date=model.occurred_at.date() if isinstance(model.occurred_at, datetime) else model.occurred_at,
             description=model.description,
             postings=tuple(postings),  # list → tuple (imutável)
-            tags=tuple(model.tags) if model.tags else (),  # list → tuple
-            notes=model.notes,
-            import_batch_id=model.import_batch_id,
+            tags=tags,
+            notes=notes,
+            import_batch_id=import_batch_id,
             created_at=model.created_at,
-            updated_at=model.updated_at,
+            updated_at=model.created_at,  # No updated_at in model
         )
 
     @staticmethod
@@ -132,10 +157,14 @@ class TransactionMapper:
             >>> transaction.notes = "Updated notes"
             >>> TransactionMapper.update_model_from_entity(model, transaction)
         """
+        model.reference = str(transaction.id)
+        model.occurred_at = transaction.date
         model.description = transaction.description
-        model.tags = list(transaction.tags)
-        model.notes = transaction.notes
-        model.updated_at = transaction.updated_at
+        model.extra_data = {
+            "tags": list(transaction.tags),
+            "notes": transaction.notes,
+            "import_batch_id": str(transaction.import_batch_id) if transaction.import_batch_id else None,
+        }
         # NOTE: postings NÃO são atualizados (imutáveis)
 
     @staticmethod
@@ -145,17 +174,19 @@ class TransactionMapper:
 
         Args:
             posting: Value object do domínio
-            transaction_id: ID da transação pai
+            transaction_id: ID da transação pai (can be None, will be set by relationship)
 
         Returns:
             ORM model do posting
         """
+        # Convert account UUID to Integer ID by looking up via code
+        # Note: This will be handled by the repository when saving
         return PostingModel(
             transaction_id=transaction_id,
-            account_id=posting.account_id,
+            account_id=uuid_to_int(posting.account_id),  # Convert UUID to Int
             amount=posting.amount.amount,  # Money → Decimal
             currency=posting.amount.currency,
-            notes=posting.notes,
+            memo=posting.notes,  # notes → memo (DB column name)
         )
 
     @staticmethod
@@ -169,11 +200,14 @@ class TransactionMapper:
         Returns:
             Value object do domínio
         """
+        # Convert Integer account_id back to UUID
+        account_id = int_to_uuid(model.account_id)
+        
         return Posting(
-            account_id=model.account_id,
+            account_id=account_id,
             amount=Money(
                 amount=Decimal(str(model.amount)),  # Garantir Decimal
                 currency=model.currency,
             ),
-            notes=model.notes,
+            notes=model.memo,  # memo → notes (domain attribute)
         )
