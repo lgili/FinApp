@@ -56,6 +56,8 @@ from finlite.application.use_cases.generate_cashflow_report import (
     GenerateCashflowReportUseCase,
 )
 from finlite.application.use_cases.export_beancount import ExportBeancountUseCase
+from finlite.application.use_cases.build_card_statement import BuildCardStatementUseCase
+from finlite.application.use_cases.pay_card import PayCardUseCase
 from finlite.config import Settings
 
 
@@ -232,6 +234,20 @@ class Container(containers.DeclarativeContainer):
 
     export_beancount_use_case = providers.Factory(
         ExportBeancountUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    build_card_statement_use_case = providers.Factory(
+        BuildCardStatementUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    pay_card_use_case = providers.Factory(
+        PayCardUseCase,
         uow=unit_of_work,
         account_repository=account_repository,
         transaction_repository=transaction_repository,

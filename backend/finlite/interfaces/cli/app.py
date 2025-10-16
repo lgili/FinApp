@@ -42,6 +42,7 @@ rules_app = typer.Typer(help="Apply classification rules")
 post_app = typer.Typer(help="Post statement entries as transactions")
 report_app = typer.Typer(help="Generate financial reports")
 export_app = typer.Typer(help="Export data to various formats")
+card_app = typer.Typer(help="Credit card management")
 
 # Register sub-apps
 app.add_typer(accounts_app, name="accounts")
@@ -51,6 +52,7 @@ app.add_typer(rules_app, name="rules")
 app.add_typer(post_app, name="post")
 app.add_typer(report_app, name="report")
 app.add_typer(export_app, name="export")
+app.add_typer(card_app, name="card")
 
 # Global container instance (initialized on first command)
 _container: Optional[Container] = None
@@ -87,6 +89,7 @@ from finlite.interfaces.cli import rules as rules_module  # noqa: E402
 from finlite.interfaces.cli import post as post_module  # noqa: E402
 from finlite.interfaces.cli import reports as reports_module  # noqa: E402
 from finlite.interfaces.cli import export as export_module  # noqa: E402
+from finlite.interfaces.cli import card as card_module  # noqa: E402
 
 accounts_module.register_commands(accounts_app, get_container)
 transactions_module.register_commands(transactions_app, get_container)
@@ -95,6 +98,7 @@ rules_module.register_commands(rules_app, get_container)
 post_module.register_commands(post_app, get_container)
 reports_module.register_commands(report_app, get_container)
 export_module.register_commands(export_app, get_container)
+card_module.register_commands(card_app, get_container)
 
 
 @app.callback()
@@ -124,6 +128,7 @@ def main_callback(
         post         - Post entries as transactions
         report       - Generate financial reports
         export       - Export data to various formats
+        card         - Credit card management
 
     Global Options:
         --debug      - Enable debug logging
