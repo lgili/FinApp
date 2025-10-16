@@ -25,13 +25,13 @@ from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import 
 class AccountMapper:
     """
     Mapper bidirectional para Account ←→ AccountModel.
-    
+
     Converts between UUID (domain) and Integer (database) IDs.
-    Stores UUID in 'code' column for full recovery.
+    Stores account code for full recovery.
 
     Examples:
         >>> # Domain → ORM
-        >>> account = Account.create("Assets:Checking", AccountType.ASSET, "BRL")
+        >>> account = Account.create(code="Assets:Checking", name="Checking", account_type=AccountType.ASSET, currency="BRL")
         >>> model = AccountMapper.to_model(account)
         >>>
         >>> # ORM → Domain
@@ -52,15 +52,15 @@ class AccountMapper:
 
         Examples:
             >>> # Novo account (insert) - não passa ID
-            >>> account = Account.create("Assets:Checking", AccountType.ASSET, "BRL")
+            >>> account = Account.create(code="Assets:Checking", name="Checking", account_type=AccountType.ASSET, currency="BRL")
             >>> model = AccountMapper.to_model(account)
-            >>> 
+            >>>
             >>> # Update account existente
             >>> model = AccountMapper.to_model(account, for_update=True)
         """
         model_data = {
             "name": account.name,
-            "code": str(account.id),  # Store UUID in code column
+            "code": account.code,  # Store account code
             "type": account.account_type.value,
             "currency": account.currency,
             "parent_id": account.parent_id,  # Repository handles UUID→Integer conversion
@@ -68,13 +68,8 @@ class AccountMapper:
             "created_at": account.created_at,
             "updated_at": account.updated_at,
         }
-        
-        # Para updates, incluir o ID convertido de UUID
-        if for_update and account.id:
-            # Extrair integer ID do UUID se possível
-            # Assumimos que UUIDs foram gerados a partir de Integer IDs
-            model_data["id"] = AccountMapper._uuid_to_int(account.id)
-        
+
+        # Note: ID is handled by repository, not set here
         return AccountModel(**model_data)
 
     @staticmethod
@@ -90,33 +85,25 @@ class AccountMapper:
             Entity do domínio
 
         Examples:
-            >>> model = AccountModel(id=1, name="Assets:Checking", ...)
+            >>> model = AccountModel(id=1, code="Assets:Checking", name="Checking", ...)
             >>> account = AccountMapper.to_entity(model)
-            >>> account.name
+            >>> account.code
             'Assets:Checking'
         """
-        # If code contains a UUID, use it; otherwise generate from integer ID
-        if model.code:
-            try:
-                account_id = UUID(model.code)
-            except (ValueError, AttributeError):
-                account_id = int_to_uuid(model.id)
-        else:
-            account_id = int_to_uuid(model.id)
-        
-        # For parent_id: if parent_model provided, use its UUID from code
+        # Generate UUID from integer ID (consistent conversion)
+        account_id = int_to_uuid(model.id)
+
+        # For parent_id: convert from integer if present
         if parent_model:
-            try:
-                parent_id = UUID(parent_model.code) if parent_model.code else int_to_uuid(parent_model.id)
-            except (ValueError, AttributeError):
-                parent_id = int_to_uuid(parent_model.id)
+            parent_id = int_to_uuid(parent_model.id)
         elif model.parent_id:
             parent_id = int_to_uuid(model.parent_id)
         else:
             parent_id = None
-            
+
         return Account(
             id=account_id,
+            code=model.code,  # Pass the code from database
             name=model.name,
             account_type=AccountType(model.type),
             currency=model.currency,
@@ -139,12 +126,12 @@ class AccountMapper:
 
         Examples:
             >>> model = session.get(AccountModel, account_id)
-            >>> account.rename("Assets:NewName")
+            >>> account.rename("New Account Name")
             >>> AccountMapper.update_model_from_entity(model, account)
             >>> session.commit()
         """
         model.name = account.name
-        model.code = str(account.id)
+        model.code = account.code
         model.type = account.account_type.value
         model.currency = account.currency
         model.parent_id = account.parent_id

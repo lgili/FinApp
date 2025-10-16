@@ -67,9 +67,9 @@ def uow_with_transactions(session_factory):
 @pytest.fixture
 def sample_accounts(uow_with_transactions):
     """Create sample accounts for testing."""
-    checking = Account.create("Checking", AccountType.ASSET, "BRL")
-    food = Account.create("Food", AccountType.EXPENSE, "BRL")
-    salary = Account.create("Salary", AccountType.INCOME, "BRL")
+    checking = Account.create(code="Assets:Checking", name="Checking", account_type=AccountType.ASSET, currency="BRL")
+    food = Account.create(code="Expenses:Food", name="Food", account_type=AccountType.EXPENSE, currency="BRL")
+    salary = Account.create(code="Income:Salary", name="Salary", account_type=AccountType.INCOME, currency="BRL")
     
     with uow_with_transactions:
         uow_with_transactions.accounts.add(checking)

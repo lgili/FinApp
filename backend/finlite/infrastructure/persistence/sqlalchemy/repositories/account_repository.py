@@ -58,26 +58,25 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             account: Entity do domínio para persistir
 
         Examples:
-            >>> account = Account.create("Assets:Checking", AccountType.ASSET, "BRL")
+            >>> account = Account.create(code="Assets:Checking", name="Checking", account_type=AccountType.ASSET, currency="BRL")
             >>> repo.add(account)
             >>> session.commit()
         """
-        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import int_to_uuid
-        
-        model = AccountMapper.to_model(account, for_update=False)
-        
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
+
+        # Convert UUID to integer ID for database storage
+        int_id = uuid_to_int(account.id)
+
+        model = AccountMapper.to_model(account, for_update=True)
+        model.id = int_id
+
         # If account has parent_id UUID, convert to integer ID by querying the parent
         if account.parent_id:
-            parent_model = self._session.query(AccountModel).filter_by(code=str(account.parent_id)).first()
-            if parent_model:
-                model.parent_id = parent_model.id
-            else:
-                model.parent_id = None
-            
+            parent_int_id = uuid_to_int(account.parent_id)
+            model.parent_id = parent_int_id
+
         self._session.add(model)
-        self._session.flush()  # Get the generated ID
-        # Update account with the generated ID (reconstructed from Integer)
-        account._id = int_to_uuid(model.id)
+        self._session.flush()
 
     def get(self, account_id: UUID) -> Account:
         """
@@ -97,13 +96,15 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> print(account.name)
         """
         from finlite.domain.exceptions import AccountNotFoundError
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
         from sqlalchemy.orm import joinedload
 
-        # Try to find by code (UUID stored as string), eagerly load parent
-        model = self._session.query(AccountModel).options(joinedload(AccountModel.parent)).filter_by(code=str(account_id)).first()
+        # Convert UUID to integer ID for database lookup
+        int_id = uuid_to_int(account_id)
+        model = self._session.query(AccountModel).options(joinedload(AccountModel.parent)).filter_by(id=int_id).first()
         if model is None:
             raise AccountNotFoundError(account_id)
-        
+
         # Pass parent_model to preserve correct UUID
         return AccountMapper.to_entity(model, parent_model=model.parent if model.parent_id else None)
 
@@ -248,7 +249,10 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> if repo.exists(account_id):
             ...     print("Conta existe")
         """
-        stmt = select(AccountModel.id).where(AccountModel.code == str(account_id))
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
+
+        int_id = uuid_to_int(account_id)
+        stmt = select(AccountModel.id).where(AccountModel.id == int_id)
         result = self._session.scalar(stmt)
         return result is not None
 
@@ -305,13 +309,15 @@ class SqlAlchemyAccountRepository(IAccountRepository):
 
         Examples:
             >>> account = repo.get(account_id)
-            >>> account.rename("Assets:NewName")
+            >>> account.rename("New Account Name")
             >>> repo.update(account)
             >>> session.commit()
         """
         from finlite.domain.exceptions import AccountNotFoundError
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
 
-        model = self._session.query(AccountModel).filter_by(code=str(account.id)).first()
+        int_id = uuid_to_int(account.id)
+        model = self._session.query(AccountModel).filter_by(id=int_id).first()
 
         if model is None:
             raise AccountNotFoundError(account.id)
@@ -334,10 +340,12 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> repo.delete(account_id)  # Apenas em testes!
         """
         from finlite.domain.exceptions import AccountNotFoundError
+        from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import uuid_to_int
 
-        model = self._session.query(AccountModel).filter_by(code=str(account_id)).first()
+        int_id = uuid_to_int(account_id)
+        model = self._session.query(AccountModel).filter_by(id=int_id).first()
 
         if model is None:
-            raise AccountNotFoundError(account_id)
+            raise AccountNotFoundError(account.id)
 
         self._session.delete(model)

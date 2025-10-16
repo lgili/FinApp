@@ -38,11 +38,19 @@ app = typer.Typer(
 accounts_app = typer.Typer(help="Account management commands")
 transactions_app = typer.Typer(help="Transaction commands")
 import_app = typer.Typer(help="Import bank statements")
+rules_app = typer.Typer(help="Apply classification rules")
+post_app = typer.Typer(help="Post statement entries as transactions")
+report_app = typer.Typer(help="Generate financial reports")
+export_app = typer.Typer(help="Export data to various formats")
 
 # Register sub-apps
 app.add_typer(accounts_app, name="accounts")
 app.add_typer(transactions_app, name="transactions")
 app.add_typer(import_app, name="import")
+app.add_typer(rules_app, name="rules")
+app.add_typer(post_app, name="post")
+app.add_typer(report_app, name="report")
+app.add_typer(export_app, name="export")
 
 # Global container instance (initialized on first command)
 _container: Optional[Container] = None
@@ -75,10 +83,18 @@ def get_container() -> Container:
 from finlite.interfaces.cli import accounts as accounts_module  # noqa: E402
 from finlite.interfaces.cli import transactions as transactions_module  # noqa: E402
 from finlite.interfaces.cli import imports as imports_module  # noqa: E402
+from finlite.interfaces.cli import rules as rules_module  # noqa: E402
+from finlite.interfaces.cli import post as post_module  # noqa: E402
+from finlite.interfaces.cli import reports as reports_module  # noqa: E402
+from finlite.interfaces.cli import export as export_module  # noqa: E402
 
 accounts_module.register_commands(accounts_app, get_container)
 transactions_module.register_commands(transactions_app, get_container)
 imports_module.register_commands(import_app, get_container)
+rules_module.register_commands(rules_app, get_container)
+post_module.register_commands(post_app, get_container)
+reports_module.register_commands(report_app, get_container)
+export_module.register_commands(export_app, get_container)
 
 
 @app.callback()
@@ -99,12 +115,16 @@ def main_callback(
 ):
     """
     Finlite CLI - Local-first accounting toolkit.
-    
+
     Commands:
         accounts     - Manage accounts
         transactions - Manage transactions
         import       - Import bank statements
-    
+        rules        - Apply classification rules
+        post         - Post entries as transactions
+        report       - Generate financial reports
+        export       - Export data to various formats
+
     Global Options:
         --debug      - Enable debug logging
         --json-logs  - Output logs as JSON (useful for log aggregation)

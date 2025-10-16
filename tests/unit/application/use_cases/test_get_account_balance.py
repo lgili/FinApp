@@ -32,7 +32,8 @@ class TestGetAccountBalanceUseCase:
         """Create a sample account."""
         return Account(
             id=uuid4(),
-            name="Assets:Checking",
+            code="Assets:Checking",
+            name="Checking Account",
             account_type=AccountType.ASSET,
             currency="USD",
             is_active=True,
@@ -51,7 +52,7 @@ class TestGetAccountBalanceUseCase:
 
         # Assert
         assert result.code == "Assets:Checking"
-        assert result.name == "Assets:Checking"
+        assert result.name == "Checking Account"
         assert result.type == "ASSET"
         assert result.currency == "USD"
         assert isinstance(result.balance, Decimal)
@@ -125,7 +126,8 @@ class TestGetAccountBalanceUseCase:
         for code, acc_type in account_types:
             account = Account(
                 id=uuid4(),
-                name=code,
+                code=code,
+                name=f"{code} Account",
                 account_type=acc_type,
                 currency="BRL",
                 is_active=True,
@@ -148,7 +150,8 @@ class TestGetAccountBalanceUseCase:
         for currency in currencies:
             account = Account(
                 id=uuid4(),
-                name=f"Assets:{currency}Account",
+                code=f"Assets:{currency}Account",
+                name=f"{currency} Account",
                 account_type=AccountType.ASSET,
                 currency=currency,
                 is_active=True,

@@ -76,7 +76,8 @@ class CreateAccountUseCase:
 
             # Create domain entity
             account = Account.create(
-                name=dto.code,  # Using code as name for now
+                code=dto.code,
+                name=dto.name,
                 account_type=AccountType[dto.type],
                 currency=dto.currency,
                 parent_id=None,  # Will be resolved later
@@ -89,7 +90,7 @@ class CreateAccountUseCase:
             logger.info(
                 "account_created",
                 account_id=str(account.id),
-                account_code=account.name,
+                account_code=account.code,
                 account_type=account.account_type.name,
                 currency=account.currency,
             )
@@ -98,7 +99,7 @@ class CreateAccountUseCase:
             if self._event_bus:
                 event = AccountCreated(
                     account_id=account.id,
-                    account_code=account.name,
+                    account_code=account.code,
                     account_type=account.account_type.name,
                     currency=account.currency,
                 )
@@ -120,7 +121,7 @@ class CreateAccountUseCase:
         """
         return AccountDTO(
             id=account.id,
-            code=account.name,  # Using name as code for now
+            code=account.code,
             name=account.name,
             type=account.account_type.name,
             currency=account.currency,

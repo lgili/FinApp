@@ -1,3 +1,32 @@
+# Examples - FinApp
+
+Small runnable examples to demonstrate common flows in the FinApp project.
+
+Prerequisites
+- Python 3.11+ (project uses 3.13 in CI but examples work on 3.11+)
+- A virtualenv in `.venv` with project dependencies installed (see `requirements.txt`)
+
+Quick start (zsh)
+
+```bash
+# from project root
+cd "$(pwd)"
+source .venv/bin/activate
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
+
+# Run examples individually
+python3 examples/01_setup_accounts.py
+python3 examples/02_create_transactions.py
+python3 examples/03_import_csv.py
+python3 examples/04_query_data.py
+python3 examples/05_full_workflow.py --reset
+```
+
+If you prefer a one-shot runner, use `examples/run_all.sh` (it will activate `.venv`).
+
+Notes
+- Examples create a local SQLite DB at `backend/finlite.db` and will call `models.Base.metadata.create_all` if needed.
+- The examples are written to be idempotent when possible (re-running shouldn't fail).
 # FinApp - Exemplos Práticos
 
 Esta pasta contém exemplos executáveis para testar e aprender a usar o FinApp.

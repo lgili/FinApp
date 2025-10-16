@@ -34,13 +34,15 @@ class TestListTransactionsUseCase:
         return {
             "checking": Account(
                 id=uuid4(),
-                name="Assets:Checking",
+                code="Assets:Checking",
+                name="Checking Account",
                 account_type=AccountType.ASSET,
                 currency="USD",
             ),
             "food": Account(
                 id=uuid4(),
-                name="Expenses:Food",
+                code="Expenses:Food",
+                name="Food Expenses",
                 account_type=AccountType.EXPENSE,
                 currency="USD",
             ),

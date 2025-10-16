@@ -114,7 +114,7 @@ class ListTransactionsUseCase:
             if posting.account_id not in account_codes:
                 try:
                     account = self._uow.accounts.get(posting.account_id)
-                    account_codes[posting.account_id] = account.name
+                    account_codes[posting.account_id] = account.code
                 except Exception:
                     account_codes[posting.account_id] = f"UNKNOWN-{posting.account_id}"
 

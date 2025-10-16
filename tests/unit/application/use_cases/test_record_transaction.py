@@ -34,13 +34,15 @@ class TestRecordTransactionUseCase:
         """Create sample accounts for testing."""
         checking = Account(
             id=uuid4(),
-            name="Assets:Checking",
+            code="Assets:Checking",
+            name="Checking Account",
             account_type=AccountType.ASSET,
             currency="USD",
         )
         food = Account(
             id=uuid4(),
-            name="Expenses:Food",
+            code="Expenses:Food",
+            name="Food Expenses",
             account_type=AccountType.EXPENSE,
             currency="USD",
         )
@@ -248,7 +250,8 @@ class TestRecordTransactionUseCase:
         food = sample_accounts["food"]
         transport = Account(
             id=uuid4(),
-            name="Expenses:Transport",
+            code="Expenses:Transport",
+            name="Transport Expenses",
             account_type=AccountType.EXPENSE,
             currency="USD",
         )

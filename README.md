@@ -10,19 +10,23 @@
 
 
 
-[![Tests](https://img.shields.io/badge/tests-187%20passing-success)](https://github.com/lgili/finapp/actions)## ✨ Features
-
+[![CI](https://github.com/lgili/finapp/actions/workflows/ci.yml/badge.svg)](https://github.com/lgili/finapp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-275%20passing-success)](https://github.com/lgili/finapp/actions)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue)](http://mypy-lang.org/)
+[![Coverage](https://img.shields.io/badge/coverage-69%25-yellow)](https://github.com/lgili/finapp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)- 📊 **Double-Entry Accounting**: Proper balance validation and transaction recording
+## ✨ Features
 
-[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue)](http://mypy-lang.org/)- 🏗️ **Clean Architecture**: Domain-driven design with clear layer separation
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)- 📡 **Event Bus**: Pub/sub pattern for audit logging and observability
+- 📊 **Double-Entry Accounting**: Proper balance validation and transaction recording
+- 🏗️ **Clean Architecture**: Domain-driven design with clear layer separation
+- 📡 **Event Bus**: Pub/sub pattern for audit logging and observability
 
 - 📝 **Structured Logging**: Production-ready with JSON output and debug modes
 
-[Documentation](https://lgili.github.io/finapp/) • - 🧪 **Full Test Coverage**: 186 tests (163 unit + 23 integration)
+[Documentation](https://lgili.github.io/finapp/) • - 🧪 **Full Test Coverage**: 275 tests (252 unit + 23 integration)
 
 [Quick Start](#quick-start) • - 🎯 **Type Safety**: Complete type hints with mypy validation
 
@@ -62,7 +66,7 @@ Finlite is a **modern, local-first personal finance application** built with **C
 
 - 📊 **Multi-Currency**: Support for USD, BRL, EUR, and more├─────────────────────────────────────────────────────────────┤
 
-- 🧪 **Well-Tested**: 187 tests (163 unit + 24 integration)│                  🔧 Infrastructure Layer                      │
+- 🧪 **Well-Tested**: 275 tests with 69% coverage│                  🔧 Infrastructure Layer                      │
 
 - 🎯 **Type-Safe**: Full mypy type checking│         (Database, Event Bus, External Services)             │
 
@@ -516,7 +520,8 @@ pytest tests/ --cov=finlite --cov-report=html- **Strategy Pattern**: Event handl
 
 - **Python 3.11+**: Modern Python with type hints
 
-- ✅ **187 tests** (163 unit + 24 integration)- **SQLAlchemy 2.0**: ORM with declarative mapping
+- ✅ **275 tests** (252 unit + 23 integration) with 69% coverage
+- **SQLAlchemy 2.0**: ORM with declarative mapping
 
 - ✅ **100% type coverage** with mypy- **Alembic**: Database migrations
 

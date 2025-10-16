@@ -43,7 +43,8 @@ class TestCreateAccountUseCase:
 
         created_account = Account(
             id=uuid4(),
-            name="Assets:Bank:Checking",
+            code="Assets:Bank:Checking",
+            name="Checking Account",
             account_type=AccountType.ASSET,
             currency="USD",
         )
@@ -55,7 +56,7 @@ class TestCreateAccountUseCase:
         # Assert
         assert result.created is True
         assert result.account.code == "Assets:Bank:Checking"
-        assert result.account.name == "Assets:Bank:Checking"
+        assert result.account.name == "Checking Account"
         assert result.account.type == "ASSET"
         assert result.account.currency == "USD"
 
@@ -76,7 +77,8 @@ class TestCreateAccountUseCase:
         # Mock existing account
         existing_account = Account(
             id=uuid4(),
-            name="Assets:Bank:Checking",
+            code="Assets:Bank:Checking",
+            name="Checking Account",
             account_type=AccountType.ASSET,
             currency="USD",
         )
@@ -103,7 +105,8 @@ class TestCreateAccountUseCase:
             mock_uow.accounts.find_by_code.return_value = None
             created_account = Account(
                 id=uuid4(),
-                name=f"Test:{account_type}",
+                code=f"Test:{account_type}",
+                name=f"{account_type} Account",
                 account_type=AccountType[account_type],
                 currency="BRL",
             )

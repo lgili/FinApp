@@ -236,8 +236,15 @@ class SqlAlchemyStatementEntryRepository(IStatementEntryRepository):
         Examples:
             >>> entry = repo.find_by_external_id(batch_id, "row_001")
         """
+        from finlite.infrastructure.persistence.sqlalchemy.models import ImportBatchModel
+
+        # Resolve integer batch id (legacy DB uses integer PK)
+        batch_model = self._session.query(ImportBatchModel).filter_by(external_id=str(batch_id)).first()
+        if not batch_model:
+            return None
+
         stmt = select(StatementEntryModel).where(
-            StatementEntryModel.batch_id == batch_id,
+            StatementEntryModel.batch_id == batch_model.id,
             StatementEntryModel.external_id == external_id,
         )
         model = self._session.scalar(stmt)
@@ -309,7 +316,12 @@ class SqlAlchemyStatementEntryRepository(IStatementEntryRepository):
         )
 
         if batch_id is not None:
-            stmt = stmt.where(StatementEntryModel.batch_id == batch_id)
+            from finlite.infrastructure.persistence.sqlalchemy.models import ImportBatchModel
+
+            batch_model = self._session.query(ImportBatchModel).filter_by(external_id=str(batch_id)).first()
+            if batch_model is None:
+                return 0
+            stmt = stmt.where(StatementEntryModel.batch_id == batch_model.id)
 
         return self._session.scalar(stmt) or 0
 

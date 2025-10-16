@@ -50,6 +50,13 @@ from finlite.application.use_cases import (
 from finlite.application.use_cases.import_nubank_statement import (
     ImportNubankStatement,
 )
+from finlite.application.use_cases.apply_rules import ApplyRulesUseCase
+from finlite.application.use_cases.post_pending_entries import PostPendingEntriesUseCase
+from finlite.application.use_cases.generate_cashflow_report import (
+    GenerateCashflowReportUseCase,
+)
+from finlite.application.use_cases.export_beancount import ExportBeancountUseCase
+from finlite.config import Settings
 
 
 class Container(containers.DeclarativeContainer):
@@ -198,6 +205,36 @@ class Container(containers.DeclarativeContainer):
         import_batch_repository=import_batch_repository,
         statement_entry_repository=statement_entry_repository,
         event_bus=event_bus,
+    )
+
+    apply_rules_use_case = providers.Factory(
+        ApplyRulesUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        statement_repository=statement_entry_repository,
+        settings=providers.Singleton(Settings),
+    )
+
+    post_pending_entries_use_case = providers.Factory(
+        PostPendingEntriesUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        statement_repository=statement_entry_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    generate_cashflow_report_use_case = providers.Factory(
+        GenerateCashflowReportUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    export_beancount_use_case = providers.Factory(
+        ExportBeancountUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
     )
 
 

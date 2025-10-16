@@ -69,7 +69,7 @@ class ListAccountsUseCase:
         """
         return AccountDTO(
             id=account.id,
-            code=account.name,  # Using name as code
+            code=account.code,
             name=account.name,
             type=account.account_type.name,
             currency=account.currency,

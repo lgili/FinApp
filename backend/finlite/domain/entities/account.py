@@ -68,6 +68,7 @@ class Account:
     """
 
     id: UUID
+    code: str  # Unique code (ex: "Assets:Checking")
     name: str
     account_type: AccountType
     currency: str
@@ -78,12 +79,14 @@ class Account:
 
     def __post_init__(self) -> None:
         """Validações após inicialização."""
+        self._validate_code()
         self._validate_name()
         self._validate_currency()
 
     @classmethod
     def create(
         cls,
+        code: str,
         name: str,
         account_type: AccountType,
         currency: str,
@@ -93,7 +96,8 @@ class Account:
         Factory method para criar nova conta.
 
         Args:
-            name: Nome da conta (ex: "Assets:Checking")
+            code: Código único da conta (ex: "Assets:Checking")
+            name: Nome descritivo da conta
             account_type: Tipo contábil
             currency: Moeda padrão (ISO 4217)
             parent_id: UUID da conta pai (opcional)
@@ -103,13 +107,15 @@ class Account:
 
         Examples:
             >>> account = Account.create(
-            ...     name="Assets:Checking",
+            ...     code="Assets:Checking",
+            ...     name="Checking Account",
             ...     account_type=AccountType.ASSET,
             ...     currency="BRL"
             ... )
         """
         return cls(
             id=uuid4(),
+            code=code,
             name=name,
             account_type=account_type,
             currency=currency,
@@ -242,23 +248,24 @@ class Account:
         """
         return self.parent_id == parent_id
 
-    def get_full_name_parts(self) -> list[str]:
+    def get_full_code_parts(self) -> list[str]:
         """
-        Divide nome completo em partes hierárquicas.
+        Divide código completo em partes hierárquicas.
 
         Returns:
-            Lista de partes do nome
+            Lista de partes do código
 
         Examples:
             >>> account = Account.create(
-            ...     "Expenses:Food:Restaurant",
-            ...     AccountType.EXPENSE,
-            ...     "BRL"
+            ...     code="Expenses:Food:Restaurant",
+            ...     name="Restaurant Expenses",
+            ...     account_type=AccountType.EXPENSE,
+            ...     currency="BRL"
             ... )
-            >>> account.get_full_name_parts()
+            >>> account.get_full_code_parts()
             ['Expenses', 'Food', 'Restaurant']
         """
-        return self.name.split(":")
+        return self.code.split(":")
 
     def get_depth(self) -> int:
         """
@@ -268,23 +275,56 @@ class Account:
             Número de níveis (1 = raiz, 2 = filho direto, etc)
 
         Examples:
-            >>> root = Account.create("Assets", AccountType.ASSET, "BRL")
+            >>> root = Account.create(
+            ...     code="Assets",
+            ...     name="Assets",
+            ...     account_type=AccountType.ASSET,
+            ...     currency="BRL"
+            ... )
             >>> root.get_depth()
             1
 
             >>> nested = Account.create(
-            ...     "Assets:Investments:Stocks",
-            ...     AccountType.ASSET,
-            ...     "BRL"
+            ...     code="Assets:Investments:Stocks",
+            ...     name="Stock Investments",
+            ...     account_type=AccountType.ASSET,
+            ...     currency="BRL"
             ... )
             >>> nested.get_depth()
             3
         """
-        return len(self.get_full_name_parts())
+        return len(self.get_full_code_parts())
+
+    def _validate_code(self) -> None:
+        """
+        Valida formato do código da conta.
+
+        Raises:
+            ValueError: Se código for inválido
+        """
+        if not isinstance(self.code, str):
+            raise TypeError(f"Account code must be str, got {type(self.code)}")
+
+        if not self.code.strip():
+            raise ValueError("Account code cannot be empty")
+
+        # Valida formato hierárquico (ex: "Assets:Checking")
+        parts = self.code.split(":")
+        for part in parts:
+            if not part.strip():
+                raise ValueError(
+                    f"Account code has empty component: '{self.code}'"
+                )
+
+            # Valida caracteres (alfanuméricos, espaços, alguns símbolos)
+            if not part.replace(" ", "").replace("-", "").replace("_", "").isalnum():
+                raise ValueError(
+                    f"Account code contains invalid characters: '{part}' in '{self.code}'"
+                )
 
     def _validate_name(self) -> None:
         """
-        Valida formato do nome da conta.
+        Valida nome da conta.
 
         Raises:
             ValueError: Se nome for inválido
@@ -294,20 +334,6 @@ class Account:
 
         if not self.name.strip():
             raise ValueError("Account name cannot be empty")
-
-        # Valida formato hierárquico (ex: "Assets:Checking")
-        parts = self.name.split(":")
-        for part in parts:
-            if not part.strip():
-                raise ValueError(
-                    f"Account name has empty component: '{self.name}'"
-                )
-
-            # Valida caracteres (alfanuméricos, espaços, alguns símbolos)
-            if not part.replace(" ", "").replace("-", "").replace("_", "").isalnum():
-                raise ValueError(
-                    f"Account name contains invalid characters: '{part}' in '{self.name}'"
-                )
 
     def _validate_currency(self) -> None:
         """
@@ -354,23 +380,24 @@ class Account:
         Representação string legível.
 
         Returns:
-            Formato: "name (type) [currency]"
+            Formato: "code - name (type) [currency]"
 
         Examples:
             >>> account = Account.create(
-            ...     "Assets:Checking",
-            ...     AccountType.ASSET,
-            ...     "BRL"
+            ...     code="Assets:Checking",
+            ...     name="Checking Account",
+            ...     account_type=AccountType.ASSET,
+            ...     currency="BRL"
             ... )
             >>> str(account)
-            'Assets:Checking (ASSET) [BRL]'
+            'Assets:Checking - Checking Account (ASSET) [BRL]'
         """
         status = "" if self.is_active else " [INACTIVE]"
-        return f"{self.name} ({self.account_type.value}) [{self.currency}]{status}"
+        return f"{self.code} - {self.name} ({self.account_type.value}) [{self.currency}]{status}"
 
     def __repr__(self) -> str:
         """Representação técnica para debug."""
         return (
-            f"Account(id={self.id!r}, name={self.name!r}, "
+            f"Account(id={self.id!r}, code={self.code!r}, name={self.name!r}, "
             f"account_type={self.account_type!r}, currency={self.currency!r})"
         )
