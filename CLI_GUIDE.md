@@ -156,6 +156,189 @@ Transactions (3 results)
 Show posting details? [y/N]:
 ```
 
+## Import Bank Statements
+
+### Import OFX Files
+
+Import bank statements in OFX format (Open Financial Exchange):
+
+```bash
+# Import OFX statement
+fin import ofx ~/Downloads/bank-statement.ofx
+
+# Import with specific currency
+fin import ofx statement.ofx --currency BRL
+
+# Import with account hint for easier reconciliation
+fin import ofx statement.ofx --account "Assets:BankAccount" --currency USD
+```
+
+**Options:**
+- `file_path` (required): Path to OFX file
+- `--currency, -c` (optional): Default currency (BRL, USD, etc.) - default: BRL
+- `--account, -a` (optional): Suggested account for entries (helps with matching)
+
+**Supported OFX Features:**
+- FITID (transaction ID) for deduplication
+- DTPOSTED (transaction date)
+- TRNAMT (amount)
+- NAME (payee/merchant)
+- MEMO (description)
+- CURRENCY (transaction-level or header-level)
+- Multi-currency transactions
+
+**Deduplication:**
+Files with the same SHA256 hash will be automatically rejected to prevent duplicate imports.
+
+**Example Output:**
+```
+Importing OFX statement: statement.ofx
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃        Import Complete               ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ ✓ Import successful!                 │
+│                                       │
+│ Batch ID: 3fe45d67-9e70-4b1b-a008... │
+│ Entries: 15                           │
+│ SHA256: a1b2c3d4e5f6...               │
+└───────────────────────────────────────┘
+
+Next steps:
+  • Review entries: fin import entries 3fe45d67-...
+  • Match to transactions: fin match auto (coming soon)
+```
+
+### Import Nubank CSV
+
+Import Nubank credit card statements in CSV format:
+
+```bash
+# Import Nubank CSV
+fin import nubank ~/Downloads/nubank-2025-10.csv
+
+# Import with account hint
+fin import nubank statement.csv --account "Liabilities:Nubank" --currency BRL
+```
+
+**Note:** Same deduplication and entry review process as OFX imports.
+
+### List Import Batches
+
+View all imported statement batches:
+
+```bash
+# List all imports
+fin import list
+
+# Filter by status
+fin import list --status COMPLETED
+fin import list --status PENDING
+
+# Limit results
+fin import list --limit 20
+```
+
+**Example Output:**
+```
+                  Import Batches (10 shown)
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Batch ID       ┃ Source    ┃ Status ┃ Entries┃ Filename       ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ 3fe45d67-9e... │ OFX       │ COMPLE │    15  │ statement.ofx  │
+│ 7a8b9c0d-1e... │ NUBANK_C… │ COMPLE │    42  │ nubank-oct.csv │
+│ 2f3e4d5c-6a... │ OFX       │ COMPLE │     8  │ bank-sep.ofx   │
+└────────────────┴───────────┴────────┴────────┴────────────────┘
+```
+
+### View Statement Entries
+
+Show entries from a specific import batch:
+
+```bash
+# Show all entries in a batch
+fin import entries <batch-id>
+
+# Filter by status
+fin import entries <batch-id> --status IMPORTED
+fin import entries <batch-id> --status POSTED
+
+# Limit results
+fin import entries <batch-id> --limit 50
+```
+
+**Example Output:**
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃     Import Batch Details        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Batch: 3fe45d67-9e70-4b1b-a008  │
+│ Source: OFX                      │
+│ Status: COMPLETED                │
+│ Total Entries: 15                │
+│ Filename: statement.ofx          │
+└──────────────────────────────────┘
+
+           Statement Entries (15 shown)
+┏━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━┓
+┃ External ID ┃ Date     ┃ Payee      ┃ Amount  ┃ Status┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━┩
+│ TXN001      │ 2025-10… │ Store ABC  │  -150.50│ IMPOR…│
+│ TXN002      │ 2025-10… │ Employer   │ 5,000.00│ IMPOR…│
+│ TXN003      │ 2025-10… │ Landlord   │-1,200.00│ IMPOR…│
+└─────────────┴──────────┴────────────┴─────────┴───────┘
+```
+
+### OFX Format Details
+
+**What is OFX?**
+OFX (Open Financial Exchange) is a standard format for exchanging financial data. Most banks and financial institutions support exporting transactions in OFX format.
+
+**How to get OFX files:**
+1. Log into your bank's website
+2. Go to transaction history or statements
+3. Look for "Export" or "Download" options
+4. Select "OFX" or "Microsoft Money" format
+5. Save the file and import with `fin import ofx <file>`
+
+**Supported Banks (Brazilian):**
+- Most Brazilian banks support OFX export
+- Nubank: Use CSV import instead (`fin import nubank`)
+- Banco do Brasil, Bradesco, Itaú, Santander: OFX supported
+- Inter, C6, Nubank: Check export options in app/website
+
+**Troubleshooting OFX Imports:**
+
+1. **"File already imported" error:**
+   - The same file (based on SHA256 hash) was already imported
+   - This prevents duplicate entries
+   - If you need to re-import, check existing batches with `fin import list`
+
+2. **"Invalid date format" error:**
+   - OFX file may be corrupted or in non-standard format
+   - Try downloading the file again from your bank
+   - Check if file is actually OFX (open in text editor, should start with "OFXHEADER")
+
+3. **Wrong amounts or currencies:**
+   - Specify correct default currency with `--currency`
+   - Check if OFX file contains CURDEF or CURRENCY tags
+   - OFX amounts are always in decimal format (100.50, not 100,50)
+
+4. **Missing transactions:**
+   - Check the date range when exporting from bank
+   - Some banks limit the number of transactions per export
+   - You may need to export multiple periods and import separately
+
+5. **Encoding issues (special characters):**
+   - The import automatically tries UTF-8, then falls back to Latin-1
+   - If characters still appear wrong, contact your bank for encoding info
+
+**Next Steps After Import:**
+1. Review imported entries: `fin import entries <batch-id>`
+2. Apply matching rules: `fin match auto` (coming soon)
+3. Post matched entries to ledger: `fin post <entry-id>` (coming soon)
+4. Generate reports: `fin report income-statement`
+
 ## Reports
 
 ### Income Statement

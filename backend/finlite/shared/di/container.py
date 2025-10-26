@@ -51,6 +51,9 @@ from finlite.application.use_cases import (
 from finlite.application.use_cases.import_nubank_statement import (
     ImportNubankStatement,
 )
+from finlite.application.use_cases.import_ofx_statement import (
+    ImportOFXStatement,
+)
 from finlite.application.use_cases.apply_rules import ApplyRulesUseCase
 from finlite.application.use_cases.post_pending_entries import PostPendingEntriesUseCase
 from finlite.application.use_cases.generate_cashflow_report import (
@@ -219,6 +222,13 @@ class Container(containers.DeclarativeContainer):
 
     import_nubank_statement_use_case = providers.Factory(
         ImportNubankStatement,
+        import_batch_repository=import_batch_repository,
+        statement_entry_repository=statement_entry_repository,
+        event_bus=event_bus,
+    )
+
+    import_ofx_statement_use_case = providers.Factory(
+        ImportOFXStatement,
         import_batch_repository=import_batch_repository,
         statement_entry_repository=statement_entry_repository,
         event_bus=event_bus,

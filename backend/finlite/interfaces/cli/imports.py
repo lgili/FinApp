@@ -3,6 +3,7 @@ Import commands - Import bank statements from CSV/OFX files.
 
 Commands:
     fin import nubank <file>  - Import Nubank CSV statement
+    fin import ofx <file>     - Import OFX bank statement
     fin import list           - List all import batches
     fin import entries <id>   - Show entries from a batch
 """
@@ -19,6 +20,10 @@ from rich.panel import Panel
 from finlite.application.use_cases.import_nubank_statement import (
     ImportNubankStatement,
     ImportNubankStatementCommand,
+)
+from finlite.application.use_cases.import_ofx_statement import (
+    ImportOFXStatement,
+    ImportOFXStatementCommand,
 )
 from finlite.domain.entities.import_batch import ImportStatus
 from finlite.domain.exceptions import DuplicateImportError
@@ -114,7 +119,84 @@ def register_commands(
             console.print(f"[red]✗ Import failed:[/red] {e}")
             logger.error("import_failed", file=str(file_path), error=str(e), exc_info=True)
             raise typer.Exit(code=1)
-    
+
+    @app.command("ofx")
+    def import_ofx(
+        file_path: Annotated[
+            Path,
+            typer.Argument(
+                help="Path to OFX file",
+                exists=True,
+                file_okay=True,
+                dir_okay=False,
+                readable=True,
+            ),
+        ],
+        currency: Annotated[
+            str,
+            typer.Option("--currency", "-c", help="Default currency (BRL, USD, etc)"),
+        ] = "BRL",
+        account_hint: Annotated[
+            Optional[str],
+            typer.Option("--account", "-a", help="Suggested account for entries"),
+        ] = None,
+    ):
+        """
+        Import OFX bank statement.
+
+        Parses standard OFX format files from banks and creates statement entries
+        in IMPORTED status. You can then review and match them to transactions.
+
+        Supports: FITID, DTPOSTED, TRNAMT, NAME, MEMO, CURRENCY fields.
+
+        Deduplication: Files with the same SHA256 hash will be rejected.
+
+        Examples:
+            $ fin import ofx ~/Downloads/statement.ofx
+            $ fin import ofx bank-statement.ofx --currency BRL --account "Assets:Bank"
+            $ fin import ofx ~/Downloads/statement.ofx --currency USD
+        """
+        container = get_container()
+        use_case: ImportOFXStatement = container.import_ofx_statement_use_case()
+
+        console.print(f"[cyan]Importing OFX statement:[/cyan] {file_path.name}")
+
+        try:
+            # Execute use case
+            command = ImportOFXStatementCommand(
+                file_path=file_path,
+                default_currency=currency.upper(),
+                account_hint=account_hint,
+            )
+
+            result = use_case.execute(command)
+
+            # Show success
+            console.print()
+            console.print(Panel.fit(
+                f"[green]✓ Import successful![/green]\n\n"
+                f"[bold]Batch ID:[/bold] {result.batch_id}\n"
+                f"[bold]Entries:[/bold] {result.entries_count}\n"
+                f"[bold]SHA256:[/bold] {result.file_sha256[:16]}...",
+                title="Import Complete",
+                border_style="green",
+            ))
+
+            console.print()
+            console.print("[dim]Next steps:[/dim]")
+            console.print(f"  • Review entries: [cyan]fin import entries {result.batch_id}[/cyan]")
+            console.print("  • Match to transactions: [cyan]fin match auto[/cyan] (coming soon)")
+
+        except DuplicateImportError as e:
+            console.print(f"[red]✗ Error:[/red] {e}")
+            console.print("[dim]This file has already been imported.[/dim]")
+            raise typer.Exit(code=1)
+
+        except Exception as e:
+            console.print(f"[red]✗ Import failed:[/red] {e}")
+            logger.error("ofx_import_failed", file=str(file_path), error=str(e), exc_info=True)
+            raise typer.Exit(code=1)
+
     @app.command("list")
     def list_imports(
         status: Annotated[
