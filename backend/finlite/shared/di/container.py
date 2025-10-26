@@ -59,6 +59,9 @@ from finlite.application.use_cases.generate_cashflow_report import (
 from finlite.application.use_cases.generate_balance_sheet_report import (
     GenerateBalanceSheetReportUseCase,
 )
+from finlite.application.use_cases.generate_income_statement_report import (
+    GenerateIncomeStatementReportUseCase,
+)
 from finlite.application.use_cases.generate_monthly_tax_report import (
     MonthlyTaxReportUseCase,
 )
@@ -246,6 +249,13 @@ class Container(containers.DeclarativeContainer):
 
     generate_balance_sheet_report_use_case = providers.Factory(
         GenerateBalanceSheetReportUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    generate_income_statement_report_use_case = providers.Factory(
+        GenerateIncomeStatementReportUseCase,
         uow=unit_of_work,
         account_repository=account_repository,
         transaction_repository=transaction_repository,

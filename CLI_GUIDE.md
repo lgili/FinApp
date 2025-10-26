@@ -156,6 +156,181 @@ Transactions (3 results)
 Show posting details? [y/N]:
 ```
 
+## Reports
+
+### Income Statement
+
+Generate a profit and loss (income statement) report for a period:
+
+```bash
+# Basic income statement for current year
+fin report income-statement
+
+# Specific period
+fin report income-statement --from 2025-01-01 --to 2025-12-31
+
+# Monthly report
+fin report income-statement --from 2025-10-01 --to 2025-10-31
+
+# Different currency
+fin report income-statement --from 2025-01-01 --to 2025-12-31 --currency USD
+```
+
+**Options:**
+- `--from, -f` (optional): Start date (YYYY-MM-DD, default: January 1st of current year)
+- `--to, -t` (optional): End date (YYYY-MM-DD, default: today)
+- `--currency, -c` (optional): Currency code (default: BRL)
+- `--compare` (optional): Comparison mode - `previous` (previous period) or `yoy` (year-over-year)
+- `--export` (optional): Export to file (CSV or Markdown): e.g., `report.csv` or `report.md`
+- `--chart` (optional): Show visual chart of revenue vs expenses
+
+**Example Output:**
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              Income Statement Summary                    ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Period: 2025-10-01 to 2025-10-31                        │
+│ Currency: BRL                                             │
+│                                                           │
+│ Total Revenue: 5,000.00 BRL                              │
+│ Total Expenses: 2,300.00 BRL                             │
+│ Net Income: 2,700.00 BRL                                 │
+└───────────────────────────────────────────────────────────┘
+
+                          Revenue
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━┓
+┃ Account        ┃ Amount     ┃ % of Revenue┃ Txns ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━┩
+│ Income:Salary  │ 5,000.00   │ 100.0%      │    1 │
+│ Total Revenue  │ 5,000.00   │             │      │
+└────────────────┴────────────┴─────────────┴──────┘
+
+                         Expenses
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━┓
+┃ Account        ┃ Amount     ┃ % of Revenue┃ Txns ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━┩
+│ Expenses:Rent  │ 1,500.00   │ 30.0%       │    1 │
+│ Expenses:Food  │   800.00   │ 16.0%       │    1 │
+│ Total Expenses │ 2,300.00   │             │      │
+└────────────────┴────────────┴─────────────┴──────┘
+```
+
+#### Comparison Modes
+
+Compare performance across periods:
+
+```bash
+# Compare to previous period (same length)
+fin report income-statement --from 2025-10-01 --to 2025-10-31 --compare previous
+
+# Compare year-over-year (same period last year)
+fin report income-statement --from 2025-10-01 --to 2025-10-31 --compare yoy
+```
+
+**Example Output with Comparison:**
+```
+                         Revenue
+┏━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Account       ┃ Amount ┃ % Rev ┃ Txns┃ Comparison     ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Income:Salary │ 5,000  │ 100%  │  1  │ 4,500 → ▲ 500  │
+│               │        │       │     │ (+11.1%)       │
+└───────────────┴────────┴───────┴─────┴────────────────┘
+```
+
+#### Export Options
+
+Export reports to CSV or Markdown for analysis:
+
+```bash
+# Export to CSV
+fin report income-statement --from 2025-01-01 --to 2025-12-31 --export annual_report.csv
+
+# Export to Markdown
+fin report income-statement --from 2025-01-01 --to 2025-12-31 --export annual_report.md
+```
+
+**CSV Output Example:**
+```csv
+Income Statement Report
+Period: 2025-01-01 to 2025-12-31,Currency: BRL
+
+REVENUE
+Account Code,Account Name,Amount,Transactions
+Income:Salary,Salary,60000.00,12
+Total Revenue,,60000.00,
+
+EXPENSES
+Account Code,Account Name,Amount,Transactions
+Expenses:Rent,Rent,18000.00,12
+Expenses:Food,Food,9600.00,24
+Total Expenses,,27600.00,
+
+NET INCOME,,32400.00,
+```
+
+#### Visual Charts
+
+Display simple charts for quick insights:
+
+```bash
+fin report income-statement --from 2025-10-01 --to 2025-10-31 --chart
+```
+
+**Example Output:**
+```
+Revenue vs Expenses Chart
+
+Revenue (5,000.00):
+██████████████████████████████████████████████████
+
+Expenses (2,300.00):
+███████████████████████
+
+Net Income: 2,700.00
+```
+
+#### Interpretation Tips
+
+**Understanding the Report:**
+
+1. **Revenue Section**: Shows all income accounts (salary, sales, etc.)
+   - Sorted by amount (highest first)
+   - Shows percentage of total revenue
+   - Helps identify main income sources
+
+2. **Expenses Section**: Shows all expense accounts (rent, food, etc.)
+   - Sorted by amount (highest first)
+   - Shows percentage of revenue for expense ratio analysis
+   - Helps identify largest spending categories
+
+3. **Net Income**: Revenue - Expenses
+   - Positive = Profit
+   - Negative = Loss
+   - Compare across periods to track trends
+
+**Common Use Cases:**
+
+- **Monthly Budgeting**: Compare actual vs planned spending
+  ```bash
+  fin report income-statement --from 2025-10-01 --to 2025-10-31
+  ```
+
+- **Year-End Review**: Analyze full year performance
+  ```bash
+  fin report income-statement --from 2025-01-01 --to 2025-12-31 --export year_2025.csv
+  ```
+
+- **Growth Tracking**: Monitor year-over-year growth
+  ```bash
+  fin report income-statement --from 2025-Q1 --compare yoy
+  ```
+
+- **Quarterly Reports**: Track business performance
+  ```bash
+  fin report income-statement --from 2025-10-01 --to 2025-12-31 --compare previous
+  ```
+
 ## Examples
 
 ### Basic Setup
