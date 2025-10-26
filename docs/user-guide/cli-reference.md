@@ -435,6 +435,45 @@ See the command help (`fin report cashflow --help`) for the full list of options
 
 ---
 
+## Tax Commands
+
+Summaries for Brazilian monthly capital gains (IR) workflows.
+
+### `fin tax monthly`
+
+Generate the capital gains report for a specific month, including sales exemptions, loss carryover, dividends, JCP, and DARF calculation.
+
+**Syntax:**
+```bash
+fin tax monthly [--month YYYY-MM] [--currency CURRENCY] [--export csv|markdown] [--output FILE]
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--month`, `-m` | Reference month (YYYY-MM). | Current month |
+| `--currency`, `-c` | Currency filter for tagged transactions. | BRL |
+| `--export`, `-e` | Export format (`csv` or `markdown`). | - |
+| `--output`, `-o` | Output file path when exporting. | `tax-report-<month>.<ext>` |
+
+**Examples:**
+
+```bash
+# Display current month summary
+fin tax monthly
+
+# Review October 2025 and export to CSV
+fin tax monthly --month 2025-10 --export csv --output ~/tax-2025-10.csv
+
+# Generate markdown snapshot for USD positions
+fin tax monthly --currency USD --export markdown
+```
+
+Transactions must include tax metadata tags such as `tax:sale=45000`, `tax:gain=7000`, `tax:loss=1200`, `tax:withheld=100`, `tax:dividend=250`, or `tax:jcp=90`. Loss carryover and exemptions (≤ R$20.000 vendas no mês) are applied automatically.
+
+---
+
 ## Exit Codes
 
 Finlite uses standard exit codes:

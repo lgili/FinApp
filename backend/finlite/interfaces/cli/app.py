@@ -43,6 +43,7 @@ post_app = typer.Typer(help="Post statement entries as transactions")
 report_app = typer.Typer(help="Generate financial reports")
 export_app = typer.Typer(help="Export data to various formats")
 card_app = typer.Typer(help="Credit card management")
+tax_app = typer.Typer(help="Tax reporting commands")
 
 # Register sub-apps
 app.add_typer(accounts_app, name="accounts")
@@ -54,6 +55,7 @@ app.add_typer(report_app, name="report")
 app.add_typer(report_app, name="reports")
 app.add_typer(export_app, name="export")
 app.add_typer(card_app, name="card")
+app.add_typer(tax_app, name="tax")
 
 # Global container instance (initialized on first command)
 _container: Optional[Container] = None
@@ -91,6 +93,7 @@ from finlite.interfaces.cli import post as post_module  # noqa: E402
 from finlite.interfaces.cli import reports as reports_module  # noqa: E402
 from finlite.interfaces.cli import export as export_module  # noqa: E402
 from finlite.interfaces.cli import card as card_module  # noqa: E402
+from finlite.interfaces.cli import tax as tax_module  # noqa: E402
 
 accounts_module.register_commands(accounts_app, get_container)
 transactions_module.register_commands(transactions_app, get_container)
@@ -100,6 +103,7 @@ post_module.register_commands(post_app, get_container)
 reports_module.register_commands(report_app, get_container)
 export_module.register_commands(export_app, get_container)
 card_module.register_commands(card_app, get_container)
+tax_module.register_commands(tax_app, get_container)
 
 
 @app.callback()

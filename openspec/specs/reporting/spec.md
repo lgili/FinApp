@@ -1,7 +1,7 @@
 # reporting Specification
 
 ## Purpose
-TBD - created by archiving change add-balance-sheet-report. Update Purpose after archive.
+Describe reporting features delivered via CLI, covering balance sheet snapshots and monthly tax summaries that help users audit financial health and compliance.
 ## Requirements
 ### Requirement: CLI Balance Sheet Report
 The system MUST provide a CLI command that summarizes account balances by type (Assets, Liabilities, Equity) as of a specified effective date, defaulting to today.
@@ -18,3 +18,16 @@ The system MUST provide a CLI command that summarizes account balances by type (
 - **THEN** balances are calculated using only postings dated on or before 2024-01-01
 - **AND** the CLI labels the report with the effective date
 
+### Requirement: Monthly Capital Gains Tax Report
+The system MUST generate a monthly Brazilian IR summary that applies the R$20.000 sales exemption, loss carryover, dividends/JCP aggregation, and DARF calculation.
+
+#### Scenario: Generate monthly tax report
+- **WHEN** the user runs `fin tax monthly --month 2025-10`
+- **THEN** the CLI outputs total sales, exempt sales, taxable gains, losses carried in/out, DARF rate and payable amount
+- **AND** the user may export the summary with `--export csv`
+
+#### Scenario: Apply loss carryover
+- **GIVEN** trades tagged with `tax:loss=2000` in September and `tax:gain=5000` in October
+- **WHEN** generating `fin tax monthly --month 2025-10`
+- **THEN** the taxable base is reduced by the R$ 2.000 carryover before calculating DARF
+- **AND** the CLI highlights the carry-in, applied, and carry-out loss amounts
