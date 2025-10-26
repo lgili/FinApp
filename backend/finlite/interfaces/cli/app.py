@@ -51,6 +51,7 @@ app.add_typer(import_app, name="import")
 app.add_typer(rules_app, name="rules")
 app.add_typer(post_app, name="post")
 app.add_typer(report_app, name="report")
+app.add_typer(report_app, name="reports")
 app.add_typer(export_app, name="export")
 app.add_typer(card_app, name="card")
 

@@ -55,6 +55,9 @@ from finlite.application.use_cases.post_pending_entries import PostPendingEntrie
 from finlite.application.use_cases.generate_cashflow_report import (
     GenerateCashflowReportUseCase,
 )
+from finlite.application.use_cases.generate_balance_sheet_report import (
+    GenerateBalanceSheetReportUseCase,
+)
 from finlite.application.use_cases.export_beancount import ExportBeancountUseCase
 from finlite.application.use_cases.build_card_statement import BuildCardStatementUseCase
 from finlite.application.use_cases.pay_card import PayCardUseCase
@@ -227,6 +230,13 @@ class Container(containers.DeclarativeContainer):
 
     generate_cashflow_report_use_case = providers.Factory(
         GenerateCashflowReportUseCase,
+        uow=unit_of_work,
+        account_repository=account_repository,
+        transaction_repository=transaction_repository,
+    )
+
+    generate_balance_sheet_report_use_case = providers.Factory(
+        GenerateBalanceSheetReportUseCase,
         uow=unit_of_work,
         account_repository=account_repository,
         transaction_repository=transaction_repository,

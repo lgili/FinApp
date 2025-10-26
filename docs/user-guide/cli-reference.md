@@ -374,6 +374,67 @@ fin accounts balance GROCERIES
 
 ---
 
+## Reports Commands
+
+Generate snapshots and summaries of your finances.
+
+### `fin report balance-sheet`
+
+Alias: `fin reports balance-sheet`
+
+Create a balance sheet snapshot showing Assets, Liabilities, Equity, and Net Worth for a specific date.
+
+**Syntax:**
+```bash
+fin report balance-sheet [--at YYYY-MM-DD] [--currency CURRENCY] [--details/--summary]
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--at` | Effective date (YYYY-MM-DD). When omitted, today is used. | Today |
+| `--currency`, `-c` | Currency filter (BRL, USD, etc.). Only postings in this currency are included. | BRL |
+| `--details/--summary` | Show per-account breakdown tables (`--summary` suppresses them). | `--details` |
+
+**Examples:**
+
+```bash
+# Snapshot for today (default currency)
+fin report balance-sheet
+
+# Historical view
+fin reports balance-sheet --at 2024-01-31
+
+# Different currency and summary mode
+fin report balance-sheet --currency USD --summary
+```
+
+**Sample Output (summary mode):**
+```
+Balance Sheet — 2024-01-31
+
+Section      Total
+───────────  ─────────────
+Assets       7,000.00 BRL
+Liabilities  2,000.00 BRL
+Equity       5,000.00 BRL
+Net Worth    5,000.00 BRL
+```
+
+### `fin report cashflow`
+
+Aggregate income and expenses over a period with optional account filtering.
+
+**Syntax:**
+```bash
+fin report cashflow [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--currency CURRENCY] [--account PREFIX] [--show-assets/--no-show-assets]
+```
+
+See the command help (`fin report cashflow --help`) for the full list of options and examples.
+
+---
+
 ## Exit Codes
 
 Finlite uses standard exit codes:

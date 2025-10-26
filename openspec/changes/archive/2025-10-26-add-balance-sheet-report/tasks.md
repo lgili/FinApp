@@ -1,0 +1,13 @@
+## 1. Discovery
+- [x] 1.1 Review existing account balance queries to confirm reusable repository methods
+- [x] 1.2 Align CLI UX with current reporting commands/patterns (flags, output style)
+
+## 2. Implementation
+- [x] 2.1 Add application service to aggregate balances by account type and effective date
+- [x] 2.2 Expose the use case through dependency injection and CLI command `fin reports balance-sheet`
+- [x] 2.3 Format output with Rich tables, highlighting Assets, Liabilities, and Equity totals with net balance
+
+## 3. Quality
+- [x] 3.1 Create unit tests for the aggregation logic (domain/application layers)
+- [x] 3.2 Add integration/CLI test covering the new command with sample data
+- [x] 3.3 Update CLI documentation with usage examples and tie into docs site navigation
