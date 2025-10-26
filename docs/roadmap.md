@@ -79,7 +79,7 @@ Finlite's journey from a simple CLI to a comprehensive personal finance platform
 
 **Features**:
 - [ ] Nubank CSV importer
-- [ ] OFX file parser
+- [ ] OFX file parser (`openspec change: add-ofx-import-support`)
 - [ ] Import batch tracking with deduplication
 - [ ] Reconciliation: match imported entries with existing transactions
 - [ ] Statement entry states: `imported` → `matched` → `posted`
@@ -160,7 +160,8 @@ Finlite's journey from a simple CLI to a comprehensive personal finance platform
 
 **Features**:
 - [ ] Balance Sheet (Assets = Liabilities + Equity)
-- [ ] Income Statement (Revenue - Expenses = Net Income)
+- [ ] Balance sheet comparisons & exports (`openspec change: enhance-balance-sheet-report`)
+- [ ] Income Statement (Revenue - Expenses = Net Income) (`openspec change: add-income-statement-report`)
 - [ ] Cash Flow Statement
 - [ ] Budget tracking by category/month
 - [ ] Spending trends and visualizations

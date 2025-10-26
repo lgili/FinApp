@@ -1,15 +1,8 @@
-## 1. Advanced Reports
-- [ ] 1.1 Implement `BalanceSheetUseCase` with period comparison logic
-- [ ] 1.2 Implement `IncomeStatementUseCase` with YoY comparison
-- [ ] 1.3 Add CLI commands `fin report balance` and `fin report income-statement`
-- [ ] 1.4 Support export options (CSV, Markdown, PDF) and optional charts
+## 1. Decomposition
+- [x] 1.1 Create `enhance-balance-sheet-report` change proposal for comparisons, exports, charts
+- [x] 1.2 Create `add-income-statement-report` change proposal for profit/loss reporting
+- [x] 1.3 Create `add-ofx-import-support` change proposal for multi-bank ingestion
 
-## 2. OFX Import
-- [ ] 2.1 Build OFX parser capable of handling multiple bank variants
-- [ ] 2.2 Implement `ImportOFXUseCase` with CLI command `fin import ofx`
-- [ ] 2.3 Map OFX transactions into `StatementEntry` records with metadata
-
-## 3. Quality & Docs
-- [ ] 3.1 Unit tests for report aggregation and formatting
-- [ ] 3.2 Integration tests for OFX ingestion using fixture files
-- [ ] 3.3 Update CLI guide and docs with report/OFX usage examples
+## 2. Cleanup
+- [x] 2.1 Update documentation and roadmap references to point at the new staged changes
+- [x] 2.2 Remove duplicated requirements/specs from this change (they now live in the new proposals)

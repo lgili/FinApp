@@ -36,7 +36,7 @@ date,description,amount,id
 
 ### OFX Files
 
-*Coming soon!* OFX (Open Financial Exchange) support will be added in a future release.
+*Coming soon!* OFX (Open Financial Exchange) support is tracked under `openspec change: add-ofx-import-support`.
 
 ## CLI Commands
 
