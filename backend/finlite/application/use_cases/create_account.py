@@ -74,14 +74,33 @@ class CreateAccountUseCase:
 
             logger.info("creating_account", account_code=dto.code, account_type=dto.type)
 
+            metadata_values = (
+                dto.card_issuer,
+                dto.card_closing_day,
+                dto.card_due_day,
+            )
+            is_liability = dto.type.upper() == AccountType.LIABILITY.name
+            if not is_liability and any(value is not None for value in metadata_values):
+                raise ValueError(
+                    "Card metadata can only be provided for LIABILITY accounts"
+                )
+            if is_liability and any(value is not None for value in metadata_values):
+                if dto.card_issuer is None or dto.card_closing_day is None or dto.card_due_day is None:
+                    raise ValueError(
+                        "card_issuer, card_closing_day, and card_due_day must all be provided for credit card accounts"
+                    )
+
             # Create domain entity
             account = Account.create(
                 code=dto.code,
                 name=dto.name,
                 account_type=AccountType[dto.type],
-                currency=dto.currency,
-                parent_id=None,  # Will be resolved later
-            )
+            currency=dto.currency,
+            parent_id=None,  # Will be resolved later
+            card_issuer=dto.card_issuer,
+            card_closing_day=dto.card_closing_day,
+            card_due_day=dto.card_due_day,
+        )
 
             # Persist
             self._uow.accounts.add(account)
@@ -129,4 +148,7 @@ class CreateAccountUseCase:
             parent_code=None,  # TODO: Resolve from parent_id
             is_placeholder=False,  # TODO: Add to Account entity
             tags=(),  # TODO: Add to Account entity
+            card_issuer=account.card_issuer,
+            card_closing_day=account.card_closing_day,
+            card_due_day=account.card_due_day,
         )

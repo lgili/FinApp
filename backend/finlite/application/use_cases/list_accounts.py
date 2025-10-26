@@ -77,4 +77,7 @@ class ListAccountsUseCase:
             parent_code=None,  # TODO: Resolve from parent_id
             is_placeholder=False,  # TODO: Add to Account entity
             tags=(),  # TODO: Add to Account entity
+            card_issuer=account.card_issuer,
+            card_closing_day=account.card_closing_day,
+            card_due_day=account.card_due_day,
         )

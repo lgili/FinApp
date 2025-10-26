@@ -16,7 +16,7 @@ import enum
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, ClassVar
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
@@ -74,6 +74,7 @@ class AccountModel(Base):
     code: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
     type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    card_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
     # Hierarchy
     parent_id: Mapped[int | None] = mapped_column(
@@ -361,6 +362,42 @@ class StatementEntryModel(Base):
             f"status='{self.status}', "
             f"amount={self.amount} {self.currency})>"
         )
+
+
+class CardStatementModel(Base):
+    """ORM model for persisted credit card statements."""
+
+    __tablename__ = "card_statements"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    card_account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    period_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    closing_day: Mapped[int] = mapped_column(nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    account: Mapped[AccountModel] = relationship("AccountModel")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "card_account_id",
+            "period_start",
+            "period_end",
+            name="uq_card_statement_period",
+        ),
+    )
 
 
 # Future models (não implementados ainda):

@@ -18,6 +18,7 @@ from typing import Protocol
 
 from finlite.domain.repositories.account_repository import IAccountRepository
 from finlite.domain.repositories.transaction_repository import ITransactionRepository
+from finlite.domain.repositories.card_statement_repository import ICardStatementRepository
 
 
 class IUnitOfWork(ABC):
@@ -37,6 +38,7 @@ class IUnitOfWork(ABC):
     # Repositories disponíveis
     accounts: IAccountRepository
     transactions: ITransactionRepository
+    card_statements: ICardStatementRepository
 
     def __enter__(self) -> IUnitOfWork:
         """Context manager entry."""

@@ -67,6 +67,7 @@ class AccountMapper:
             "is_archived": not account.is_active,
             "created_at": account.created_at,
             "updated_at": account.updated_at,
+            "card_metadata": AccountMapper._card_metadata_to_dict(account),
         }
 
         # Note: ID is handled by repository, not set here
@@ -111,6 +112,7 @@ class AccountMapper:
             is_active=not model.is_archived,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            **AccountMapper._card_metadata_to_kwargs(model.card_metadata),
         )
 
     @staticmethod
@@ -137,3 +139,34 @@ class AccountMapper:
         model.parent_id = account.parent_id
         model.is_archived = not account.is_active
         model.updated_at = account.updated_at
+        model.card_metadata = AccountMapper._card_metadata_to_dict(account)
+
+    @staticmethod
+    def _card_metadata_to_dict(account: Account) -> dict[str, str | int]:
+        """
+        Serialize card metadata to dict for persistence.
+        """
+        if not account.has_card_metadata():
+            return {}
+        return {
+            "issuer": account.card_issuer,
+            "closing_day": account.card_closing_day,
+            "due_day": account.card_due_day,
+        }
+
+    @staticmethod
+    def _card_metadata_to_kwargs(metadata: dict[str, str | int] | None) -> dict[str, int | str | None]:
+        """
+        Deserialize stored metadata into Account kwargs.
+        """
+        if not metadata:
+            return {
+                "card_issuer": None,
+                "card_closing_day": None,
+                "card_due_day": None,
+            }
+        return {
+            "card_issuer": metadata.get("issuer"),
+            "card_closing_day": metadata.get("closing_day"),
+            "card_due_day": metadata.get("due_day"),
+        }

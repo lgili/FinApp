@@ -64,6 +64,10 @@ fin accounts create -c "SAVINGS-BRL" -n "Brazilian Savings" -t ASSET --currency 
 
 # Create hierarchical account
 fin accounts create -c "GROCERIES" -n "Groceries" -t EXPENSE --parent "FOOD"
+
+# Create credit card liability with metadata
+fin accounts create -c "LIAB:CARD:NUBANK" -n "Nubank" -t LIABILITY --currency BRL \
+  --card-issuer Nubank --card-closing-day 7 --card-due-day 15
 ```
 
 **Output:**
@@ -432,6 +436,48 @@ fin report cashflow [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--currency CURRENCY] 
 ```
 
 See the command help (`fin report cashflow --help`) for the full list of options and examples.
+
+---
+
+## Card Commands
+
+Manage credit card liabilities with dedicated metadata and billing-cycle helpers.
+
+### `fin card list`
+
+List all credit card accounts (LIABILITY) that include metadata.
+
+```bash
+fin card list
+```
+
+Displays issuer, closing day, and due day so you can confirm the configuration.
+
+### `fin card build-statement`
+
+Generate and persist a statement for a billing cycle. The command derives the period using the account metadata (`--card-issuer`, `--card-closing-day`, `--card-due-day`).
+
+**Syntax:**
+```bash
+fin card build-statement --card CODE [--period YYYY-MM] [--currency CURRENCY] [--show-items/--no-show-items]
+```
+
+**Examples:**
+```bash
+fin card build-statement --card Liabilities:CreditCard:Nubank
+fin card build-statement --card Liabilities:CreditCard:Nubank --period 2025-10
+fin card build-statement --card Liabilities:CreditCard:Nubank --no-show-items
+```
+
+Purchases should be recorded with the credit card liability account as the opposing posting (negative amount) and may include tags such as `card:installment=1/3` or `card:installment_key=<id>` to surface installment context in the statement.
+
+### `fin card pay`
+
+Register a payment that transfers from an asset account to the card liability. When the amount matches the open statement total, the statement is automatically marked as paid.
+
+```bash
+fin card pay --card Liabilities:CreditCard:Nubank --from Assets:Checking --amount 1500 --date 2025-10-10
+```
 
 ---
 

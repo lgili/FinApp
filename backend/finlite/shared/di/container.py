@@ -32,6 +32,7 @@ from finlite.infrastructure.persistence.sqlalchemy.mappers import (
 )
 from finlite.infrastructure.persistence.sqlalchemy.repositories import (
     SqlAlchemyAccountRepository,
+    SqlAlchemyCardStatementRepository,
     SqlAlchemyImportBatchRepository,
     SqlAlchemyStatementEntryRepository,
     SqlAlchemyTransactionRepository,
@@ -156,6 +157,11 @@ class Container(containers.DeclarativeContainer):
         session=session_factory,
     )
 
+    card_statement_repository = providers.Factory(
+        SqlAlchemyCardStatementRepository,
+        session=session_factory,
+    )
+
     # =========================================================================
     # Unit of Work
     # =========================================================================
@@ -262,6 +268,7 @@ class Container(containers.DeclarativeContainer):
         uow=unit_of_work,
         account_repository=account_repository,
         transaction_repository=transaction_repository,
+        card_statement_repository=card_statement_repository,
     )
 
     pay_card_use_case = providers.Factory(
@@ -269,6 +276,7 @@ class Container(containers.DeclarativeContainer):
         uow=unit_of_work,
         account_repository=account_repository,
         transaction_repository=transaction_repository,
+        card_statement_repository=card_statement_repository,
     )
 
 

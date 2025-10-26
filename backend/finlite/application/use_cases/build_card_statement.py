@@ -1,224 +1,313 @@
-"""
-Build Card Statement Use Case - Gera fatura de cartão de crédito.
-
-Responsabilidade: Calcular fatura de cartão (LIABILITY account) para um período,
-incluindo todas as compras e o total a pagar.
-"""
+"""Build Credit Card Statement use case."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
-from uuid import UUID
+from typing import Optional, Tuple
 
+from finlite.domain.entities.card_statement import (
+    CardStatementItem,
+    CardStatementRecord,
+    StatementStatus,
+)
 from finlite.domain.repositories.account_repository import IAccountRepository
+from finlite.domain.repositories.card_statement_repository import ICardStatementRepository
 from finlite.domain.repositories.transaction_repository import ITransactionRepository
 from finlite.domain.value_objects.account_type import AccountType
 from finlite.infrastructure.persistence.unit_of_work import UnitOfWork
 
+EARLIEST_DATETIME = datetime(2000, 1, 1)
 
-@dataclass
+
+@dataclass(frozen=True)
 class BuildCardStatementCommand:
-    """Command para gerar fatura de cartão."""
+    """Command to generate credit card statement for a given period (YYYY-MM)."""
 
-    card_account_code: str  # ex: "Liabilities:CreditCard:Nubank"
-    from_date: datetime
-    to_date: datetime
+    card_account_code: str
+    period: date  # First day of the reference month
     currency: str = "BRL"
 
 
-@dataclass
-class StatementItem:
-    """Item individual da fatura."""
+@dataclass(frozen=True)
+class StatementChargeView:
+    """Presentation-friendly statement item."""
 
-    date: datetime
+    occurred_at: datetime
     description: str
-    amount: Decimal  # Sempre positivo (valor da compra)
-    category_code: str  # Conta de despesa (ex: "Expenses:Food")
+    amount: Decimal
+    category_code: str
     category_name: str
-    transaction_id: UUID
+    transaction_id: str
+    installment_number: Optional[int] = None
+    installment_total: Optional[int] = None
+    installment_key: Optional[str] = None
 
 
-@dataclass
-class CardStatement:
-    """Fatura de cartão de crédito."""
+@dataclass(frozen=True)
+class CardStatementResult:
+    """Result returned to CLI layer."""
 
+    statement_id: str
     card_account_code: str
     card_account_name: str
-    from_date: datetime
-    to_date: datetime
+    period_start: date
+    period_end: date
+    due_date: date
+    closing_day: int
     currency: str
-
-    # Items da fatura (compras)
-    items: list[StatementItem]
-
-    # Totais
-    total_amount: Decimal  # Total das compras (sempre positivo)
-    item_count: int
-
-    # Saldo anterior (se houver)
     previous_balance: Decimal
+    charges_total: Decimal
+    total_due: Decimal
+    status: StatementStatus
+    items: tuple[StatementChargeView, ...]
 
 
 class BuildCardStatementUseCase:
-    """
-    Use case para gerar fatura de cartão de crédito.
-
-    Em contabilidade de partida dobrada:
-    - Cartão de crédito é LIABILITY (passivo)
-    - Compras CREDITAM o cartão (aumentam a dívida)
-    - Pagamentos DEBITAM o cartão (reduzem a dívida)
-
-    Fluxo:
-    1. Valida que a conta é do tipo LIABILITY
-    2. Busca todas as transactions que envolvem a conta do cartão
-    3. Agrupa por tipo de posting (compras vs pagamentos)
-    4. Gera fatura com detalhes das compras
-
-    Examples:
-        >>> result = use_case.execute(
-        ...     BuildCardStatementCommand(
-        ...         card_account_code="Liabilities:CreditCard:Nubank",
-        ...         from_date=datetime(2025, 10, 1),
-        ...         to_date=datetime(2025, 10, 31),
-        ...         currency="BRL"
-        ...     )
-        ... )
-        >>> print(f"Total: R$ {result.total_amount}")
-    """
+    """Generates and persists a credit card statement for a billing cycle."""
 
     def __init__(
         self,
         uow: UnitOfWork,
         account_repository: IAccountRepository,
         transaction_repository: ITransactionRepository,
-    ):
-        """
-        Initialize use case.
+        card_statement_repository: ICardStatementRepository,
+    ) -> None:
+        self._uow = uow
+        self._account_repository = account_repository
+        self._transaction_repository = transaction_repository
+        self._card_statement_repository = card_statement_repository
 
-        Args:
-            uow: Unit of Work
-            account_repository: Repository de contas
-            transaction_repository: Repository de transactions
-        """
-        self.uow = uow
-        self.account_repository = account_repository
-        self.transaction_repository = transaction_repository
-
-    def execute(self, command: BuildCardStatementCommand) -> CardStatement:
-        """
-        Executa geração da fatura.
-
-        Args:
-            command: Comando com parâmetros
-
-        Returns:
-            Fatura de cartão
-
-        Raises:
-            ValueError: Se conta não for do tipo LIABILITY
-            ValueError: Se conta não existir
-        """
-        with self.uow:
-            # 1. Buscar conta do cartão
-            card_account = self.account_repository.find_by_code(command.card_account_code)
+    def execute(self, command: BuildCardStatementCommand) -> CardStatementResult:
+        with self._uow:
+            card_account = self._account_repository.find_by_code(command.card_account_code)
             if not card_account:
-                raise ValueError(
-                    f"Card account not found: {command.card_account_code}"
-                )
+                raise ValueError(f"Card account not found: {command.card_account_code}")
 
-            # 2. Validar que é LIABILITY
             if card_account.account_type != AccountType.LIABILITY:
+                raise ValueError("Credit card statements require a LIABILITY account")
+
+            if not card_account.has_card_metadata():
                 raise ValueError(
-                    f"Account {command.card_account_code} is not a LIABILITY account. "
-                    f"Credit cards must be LIABILITY type."
+                    "Credit card metadata (issuer, closing day, due day) must be configured"
                 )
 
-            # 3. Buscar transactions no período que envolvem o cartão
-            all_transactions = self.transaction_repository.find_by_date_range(
-                from_date=command.from_date,
-                to_date=command.to_date,
+            period_start, period_end, due_date = self._compute_period(
+                command.period,
+                card_account.card_closing_day,
+                card_account.card_due_day,
             )
 
-            # Filtrar apenas transactions que envolvem o cartão
-            card_transactions = [
-                txn for txn in all_transactions if txn.has_account(card_account.id)
-            ]
+            existing = self._card_statement_repository.find_by_period(
+                card_account_id=card_account.id,
+                period_start=period_start,
+                period_end=period_end,
+            )
 
-            # 4. Buscar todas as contas (para lookup)
-            all_accounts = self.account_repository.list_all()
-            accounts_by_id = {acc.id: acc for acc in all_accounts}
+            items, charges_total = self._collect_items(
+                card_account_id=card_account.id,
+                period_start=period_start,
+                period_end=period_end,
+                currency=command.currency,
+            )
 
-            # 5. Processar items da fatura
-            items: list[StatementItem] = []
-            total_charges = Decimal("0")  # Total das compras
+            previous_balance = self._calculate_previous_balance(
+                card_account_id=card_account.id,
+                period_start=period_start,
+                currency=command.currency,
+            )
 
-            for txn in card_transactions:
-                # Buscar posting do cartão
-                card_postings = txn.get_postings_for_account(card_account.id)
+            total_due = previous_balance + charges_total
 
-                for card_posting in card_postings:
-                    # Em LIABILITY, crédito (negativo) aumenta dívida = compra
-                    # Débito (positivo) reduz dívida = pagamento
-                    if card_posting.is_credit():  # Compra
-                        # Buscar a outra conta da transaction (categoria da despesa)
-                        other_postings = [
-                            p for p in txn.postings if p.account_id != card_account.id
-                        ]
+            if existing:
+                record = CardStatementRecord(
+                    id=existing.id,
+                    card_account_id=existing.card_account_id,
+                    period_start=period_start,
+                    period_end=period_end,
+                    closing_day=card_account.card_closing_day,
+                    due_date=due_date,
+                    currency=command.currency,
+                    total_amount=charges_total,
+                    items=tuple(items),
+                    status=existing.status,
+                    created_at=existing.created_at,
+                    updated_at=datetime.utcnow(),
+                )
+            else:
+                record = CardStatementRecord.create(
+                    card_account_id=card_account.id,
+                    period_start=period_start,
+                    period_end=period_end,
+                    closing_day=card_account.card_closing_day,
+                    due_date=due_date,
+                    currency=command.currency,
+                    items=items,
+                    total_amount=charges_total,
+                )
 
-                        if other_postings:
-                            # Pegar a primeira conta (normalmente é única)
-                            other_posting = other_postings[0]
-                            category_account = accounts_by_id.get(other_posting.account_id)
+            saved = self._card_statement_repository.save(record)
 
-                            category_code = (
-                                category_account.code
-                                if category_account
-                                else "Unknown"
-                            )
-                            category_name = (
-                                category_account.name
-                                if category_account
-                                else "Unknown Category"
-                            )
-                        else:
-                            category_code = "Unknown"
-                            category_name = "Unknown Category"
-
-                        # Valor da compra (sempre positivo na fatura)
-                        charge_amount = abs(card_posting.amount.amount)
-
-                        items.append(
-                            StatementItem(
-                                date=txn.date,
-                                description=txn.description,
-                                amount=charge_amount,
-                                category_code=category_code,
-                                category_name=category_name,
-                                transaction_id=txn.id,
-                            )
-                        )
-
-                        total_charges += charge_amount
-
-            # 6. Ordenar items por data
-            items.sort(key=lambda x: x.date)
-
-            # 7. Calcular saldo anterior (transactions antes do período)
-            # Para simplificar, vamos deixar como 0 por enquanto
-            # No futuro, podemos calcular o saldo de todas as transactions anteriores
-            previous_balance = Decimal("0")
-
-            return CardStatement(
+            return CardStatementResult(
+                statement_id=str(saved.id),
                 card_account_code=card_account.code,
                 card_account_name=card_account.name,
-                from_date=command.from_date,
-                to_date=command.to_date,
+                period_start=period_start,
+                period_end=period_end,
+                due_date=due_date,
+                closing_day=card_account.card_closing_day,
                 currency=command.currency,
-                items=items,
-                total_amount=total_charges,
-                item_count=len(items),
                 previous_balance=previous_balance,
+                charges_total=charges_total,
+                total_due=total_due,
+                status=saved.status,
+                items=tuple(
+                    StatementChargeView(
+                        occurred_at=item.occurred_at,
+                        description=item.description,
+                        amount=item.amount,
+                        category_code=item.category_code,
+                        category_name=item.category_name,
+                        transaction_id=str(item.transaction_id),
+                        installment_number=item.installment_number,
+                        installment_total=item.installment_total,
+                        installment_key=item.installment_key,
+                    )
+                    for item in saved.items
+                ),
             )
+
+    # ------------------------------------------------------------------ helpers
+
+    def _compute_period(
+        self,
+        period_anchor: date,
+        closing_day: int,
+        due_day: int,
+    ) -> Tuple[date, date, date]:
+        year = period_anchor.year
+        month = period_anchor.month
+
+        period_end = self._coerce_day(date(year, month, 1), closing_day)
+        previous_month = (period_end.replace(day=1) - timedelta(days=1)).replace(day=1)
+        period_start = self._coerce_day(previous_month, closing_day) + timedelta(days=1)
+
+        due_month = month
+        due_year = year
+        if due_day <= closing_day:
+            # due date is in the following month
+            if month == 12:
+                due_month = 1
+                due_year += 1
+            else:
+                due_month += 1
+        due_date = self._coerce_day(date(due_year, due_month, 1), due_day)
+        return period_start, period_end, due_date
+
+    def _coerce_day(self, base: date, target_day: int) -> date:
+        last_day = self._last_day_of_month(base.year, base.month)
+        day = min(target_day, last_day.day)
+        return base.replace(day=day)
+
+    def _last_day_of_month(self, year: int, month: int) -> date:
+        if month == 12:
+            return date(year, 12, 31)
+        next_month = date(year, month + 1, 1)
+        return next_month - timedelta(days=1)
+
+    def _collect_items(
+        self,
+        card_account_id: UUID,
+        period_start: date,
+        period_end: date,
+        currency: str,
+    ) -> tuple[list[CardStatementItem], Decimal]:
+        transactions = self._transaction_repository.find_by_date_range(
+            start_date=datetime.combine(period_start, datetime.min.time()),
+            end_date=datetime.combine(period_end, datetime.max.time()),
+        )
+
+        all_accounts = {acc.id: acc for acc in self._account_repository.list_all()}
+        items: list[CardStatementItem] = []
+        total = Decimal("0")
+
+        for txn in transactions:
+            if not txn.has_account(card_account_id):
+                continue
+
+            installment_number, installment_total, installment_key = self._parse_installment(txn.tags or ())
+            card_postings = txn.get_postings_for_account(card_account_id)
+
+            for posting in card_postings:
+                if posting.amount.currency.upper() != currency.upper():
+                    continue
+                if posting.is_credit():  # purchase
+                    other_posting = next((p for p in txn.postings if p.account_id != card_account_id), None)
+                    category_code = "Unknown"
+                    category_name = "Unknown"
+                    if other_posting:
+                        account = all_accounts.get(other_posting.account_id)
+                        if account:
+                            category_code = account.code
+                            category_name = account.name
+
+                    amount = abs(posting.amount.amount)
+                    total += amount
+                    items.append(
+                        CardStatementItem(
+                            transaction_id=txn.id,
+                            occurred_at=datetime.combine(txn.date, datetime.min.time()),
+                            description=txn.description,
+                            amount=amount,
+                            currency=posting.amount.currency,
+                            category_code=category_code,
+                            category_name=category_name,
+                            installment_number=installment_number,
+                            installment_total=installment_total,
+                            installment_key=installment_key,
+                        )
+                    )
+
+        items.sort(key=lambda item: item.occurred_at)
+        return items, total
+
+    def _calculate_previous_balance(
+        self,
+        card_account_id: UUID,
+        period_start: date,
+        currency: str,
+    ) -> Decimal:
+        if period_start <= date(2000, 1, 1):
+            return Decimal("0")
+
+        preceding_transactions = self._transaction_repository.find_by_date_range(
+            start_date=EARLIEST_DATETIME,
+            end_date=datetime.combine(period_start - timedelta(days=1), datetime.max.time()),
+        )
+        balance = Decimal("0")
+        for txn in preceding_transactions:
+            if not txn.has_account(card_account_id):
+                continue
+            for posting in txn.get_postings_for_account(card_account_id):
+                if posting.amount.currency.upper() != currency.upper():
+                    continue
+                balance += -posting.amount.amount
+        return balance
+
+    def _parse_installment(self, tags: tuple[str, ...]) -> tuple[Optional[int], Optional[int], Optional[str]]:
+        number = total = None
+        key = None
+        for tag in tags:
+            if tag.startswith("card:installment="):
+                payload = tag.split("=", 1)[1]
+                if "/" in payload:
+                    current_str, total_str = payload.split("/", 1)
+                    try:
+                        number = int(current_str)
+                        total = int(total_str)
+                    except ValueError:
+                        number = total = None
+            elif tag.startswith("card:installment_key="):
+                key = tag.split("=", 1)[1]
+        return number, total, key

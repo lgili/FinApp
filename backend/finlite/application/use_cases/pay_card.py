@@ -14,6 +14,7 @@ from uuid import UUID
 from finlite.domain.entities.transaction import Transaction
 from finlite.domain.repositories.account_repository import IAccountRepository
 from finlite.domain.repositories.transaction_repository import ITransactionRepository
+from finlite.domain.repositories.card_statement_repository import ICardStatementRepository
 from finlite.domain.value_objects.account_type import AccountType
 from finlite.domain.value_objects.money import Money
 from finlite.domain.value_objects.posting import Posting
@@ -81,6 +82,7 @@ class PayCardUseCase:
         uow: UnitOfWork,
         account_repository: IAccountRepository,
         transaction_repository: ITransactionRepository,
+        card_statement_repository: ICardStatementRepository,
     ):
         """
         Initialize use case.
@@ -93,6 +95,7 @@ class PayCardUseCase:
         self.uow = uow
         self.account_repository = account_repository
         self.transaction_repository = transaction_repository
+        self.card_statement_repository = card_statement_repository
 
     def execute(self, command: PayCardCommand) -> PayCardResult:
         """
@@ -168,6 +171,8 @@ class PayCardUseCase:
             self.transaction_repository.add(transaction)
             self.uow.commit()
 
+            self._mark_related_statement_paid(card_account.id, command)
+
             return PayCardResult(
                 transaction_id=transaction.id,
                 card_account_code=card_account.code,
@@ -176,3 +181,14 @@ class PayCardUseCase:
                 currency=command.currency,
                 date=command.date,
             )
+
+    def _mark_related_statement_paid(self, card_account_id: UUID, command: PayCardCommand) -> None:
+        open_statements = list(self.card_statement_repository.list_open(card_account_id))
+        if not open_statements:
+            return
+        # Mark the latest open statement as paid when payment covers its amount
+        latest = max(open_statements, key=lambda stmt: stmt.period_end)
+        if latest.currency != command.currency:
+            return
+        if command.amount >= latest.total_amount:
+            self.card_statement_repository.mark_paid(latest.id)

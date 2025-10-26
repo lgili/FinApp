@@ -118,3 +118,33 @@ class TestCreateAccountUseCase:
             # Assert
             assert result.created is True
             assert result.account.type == account_type
+
+    def test_create_card_account_with_metadata(self, use_case, mock_uow):
+        dto = CreateAccountDTO(
+            code="Liabilities:CreditCard:Nubank",
+            name="Nubank",
+            type="LIABILITY",
+            currency="BRL",
+            card_issuer="Nubank",
+            card_closing_day=7,
+            card_due_day=15,
+        )
+
+        mock_uow.accounts.find_by_code.return_value = None
+        created_account = Account(
+            id=uuid4(),
+            code="Liabilities:CreditCard:Nubank",
+            name="Nubank",
+            account_type=AccountType.LIABILITY,
+            currency="BRL",
+            card_issuer="Nubank",
+            card_closing_day=7,
+            card_due_day=15,
+        )
+        mock_uow.accounts.add.return_value = created_account
+
+        result = use_case.execute(dto)
+
+        assert result.account.card_issuer == "Nubank"
+        assert result.account.card_closing_day == 7
+        assert result.account.card_due_day == 15

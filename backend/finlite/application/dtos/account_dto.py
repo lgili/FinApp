@@ -18,6 +18,9 @@ class AccountDTO:
     parent_code: str | None = None
     is_placeholder: bool = False
     tags: tuple[str, ...] = ()
+    card_issuer: str | None = None
+    card_closing_day: int | None = None
+    card_due_day: int | None = None
 
     @property
     def full_path(self) -> str:
@@ -38,3 +41,6 @@ class CreateAccountDTO:
     parent_code: str | None = None
     is_placeholder: bool = False
     tags: tuple[str, ...] = ()
+    card_issuer: str | None = None
+    card_closing_day: int | None = None
+    card_due_day: int | None = None

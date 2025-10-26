@@ -12,10 +12,14 @@ from finlite.infrastructure.persistence.sqlalchemy.repositories.statement_entry_
 from finlite.infrastructure.persistence.sqlalchemy.repositories.transaction_repository import (
     SqlAlchemyTransactionRepository,
 )
+from finlite.infrastructure.persistence.sqlalchemy.repositories.card_statement_repository import (
+    SqlAlchemyCardStatementRepository,
+)
 
 __all__ = [
     "SqlAlchemyAccountRepository",
     "SqlAlchemyImportBatchRepository",
     "SqlAlchemyStatementEntryRepository",
     "SqlAlchemyTransactionRepository",
+    "SqlAlchemyCardStatementRepository",
 ]

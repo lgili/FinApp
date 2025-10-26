@@ -33,6 +33,18 @@ def register_commands(app: typer.Typer, get_container: Callable):
         parent_code: Annotated[
             str | None, typer.Option("--parent", help="Parent account code (optional)")
         ] = None,
+        card_issuer: Annotated[
+            str | None,
+            typer.Option("--card-issuer", help="Credit card issuer (for LIABILITY accounts)"),
+        ] = None,
+        card_closing_day: Annotated[
+            int | None,
+            typer.Option("--card-closing-day", help="Credit card closing day (1-31)"),
+        ] = None,
+        card_due_day: Annotated[
+            int | None,
+            typer.Option("--card-due-day", help="Credit card due day (1-31)"),
+        ] = None,
     ):
         """
         Create a new account.
@@ -47,6 +59,15 @@ def register_commands(app: typer.Typer, get_container: Callable):
             container = get_container()
             use_case = container.create_account_use_case()
             
+            if account_type.upper() != "LIABILITY" and any(
+                value is not None
+                for value in (card_issuer, card_closing_day, card_due_day)
+            ):
+                console.print(
+                    "[red]Card metadata can only be provided for LIABILITY accounts.[/red]"
+                )
+                raise typer.Exit(1)
+
             # Create DTO
             dto = CreateAccountDTO(
                 code=code,
@@ -54,6 +75,9 @@ def register_commands(app: typer.Typer, get_container: Callable):
                 type=account_type.upper(),
                 currency=currency.upper(),
                 parent_code=parent_code,
+                card_issuer=card_issuer,
+                card_closing_day=card_closing_day,
+                card_due_day=card_due_day,
             )
             
             # Execute use case
@@ -66,6 +90,10 @@ def register_commands(app: typer.Typer, get_container: Callable):
                 console.print(f"   Name: {result.account.name}")
                 console.print(f"   Type: {result.account.type}")
                 console.print(f"   Currency: {result.account.currency}")
+                if result.account.card_issuer:
+                    console.print(
+                        f"   Card Issuer: {result.account.card_issuer} | Closing day: {result.account.card_closing_day} | Due day: {result.account.card_due_day}"
+                    )
             else:
                 console.print(f"ℹ️  [yellow]Account already exists[/yellow]")
                 

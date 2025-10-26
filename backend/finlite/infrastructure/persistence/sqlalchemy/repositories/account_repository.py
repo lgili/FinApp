@@ -147,12 +147,16 @@ class SqlAlchemyAccountRepository(IAccountRepository):
             >>> if account:
             ...     print(account.name)
         """
-        # No ORM, o 'code' do domínio é armazenado como 'name'
-        stmt = select(AccountModel).where(AccountModel.name == code)
+        stmt = select(AccountModel).where(AccountModel.code == code)
         model = self._session.scalar(stmt)
 
         if model is None:
-            return None
+            # Backwards compatibility with legacy rows that stored code in name
+            legacy_stmt = select(AccountModel).where(AccountModel.name == code)
+            model = self._session.scalar(legacy_stmt)
+            if model is None:
+                return None
+
         return AccountMapper.to_entity(model)
 
     def find_by_type(self, account_type: AccountType) -> list[Account]:

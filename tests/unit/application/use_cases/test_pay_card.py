@@ -1,6 +1,6 @@
 """Unit tests for PayCardUseCase."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import Mock
 from uuid import uuid4
@@ -11,6 +11,7 @@ from finlite.application.use_cases.pay_card import (
     PayCardUseCase,
 )
 from finlite.domain.entities.account import Account
+from finlite.domain.entities.card_statement import CardStatementRecord
 from finlite.domain.value_objects.account_type import AccountType
 
 
@@ -36,12 +37,20 @@ class TestPayCardUseCase:
         return Mock()
 
     @pytest.fixture
-    def use_case(self, mock_uow, mock_account_repo, mock_transaction_repo):
+    def mock_card_statement_repo(self):
+        """Create mock card statement repository."""
+        repo = Mock()
+        repo.list_open.return_value = []
+        return repo
+
+    @pytest.fixture
+    def use_case(self, mock_uow, mock_account_repo, mock_transaction_repo, mock_card_statement_repo):
         """Create use case instance."""
         return PayCardUseCase(
             uow=mock_uow,
             account_repository=mock_account_repo,
             transaction_repository=mock_transaction_repo,
+            card_statement_repository=mock_card_statement_repo,
         )
 
     @pytest.fixture
@@ -62,7 +71,13 @@ class TestPayCardUseCase:
         return {"card": card, "checking": checking}
 
     def test_pay_card_success(
-        self, use_case, mock_uow, mock_account_repo, mock_transaction_repo, sample_accounts
+        self,
+        use_case,
+        mock_uow,
+        mock_account_repo,
+        mock_transaction_repo,
+        mock_card_statement_repo,
+        sample_accounts,
     ):
         """Test successful card payment."""
         # Arrange
@@ -123,6 +138,7 @@ class TestPayCardUseCase:
 
         # Verify transaction has tag
         assert "card-payment" in added_transaction.tags
+        mock_card_statement_repo.list_open.assert_called_once()
 
     def test_pay_card_account_not_found(self, use_case, mock_uow, mock_account_repo):
         """Test error when card account doesn't exist."""
@@ -143,6 +159,41 @@ class TestPayCardUseCase:
 
         assert "Card account not found" in str(exc_info.value)
         assert "NonExistent" in str(exc_info.value)
+
+    def test_pay_card_marks_statement_paid(
+        self,
+        use_case,
+        mock_account_repo,
+        mock_card_statement_repo,
+        sample_accounts,
+    ):
+        card = sample_accounts["card"]
+        checking = sample_accounts["checking"]
+
+        mock_account_repo.find_by_code.side_effect = lambda code: card if "CreditCard" in code else checking
+
+        record = CardStatementRecord.create(
+            card_account_id=card.id,
+            period_start=date(2025, 9, 8),
+            period_end=date(2025, 10, 7),
+            closing_day=7,
+            due_date=date(2025, 10, 15),
+            currency="BRL",
+            items=[],
+            total_amount=Decimal("500.00"),
+        )
+        mock_card_statement_repo.list_open.return_value = [record]
+
+        command = PayCardCommand(
+            card_account_code="Liabilities:CreditCard:Nubank",
+            payment_account_code="Assets:Checking",
+            amount=Decimal("500.00"),
+            currency="BRL",
+            date=datetime(2025, 10, 8),
+        )
+
+        use_case.execute(command)
+        mock_card_statement_repo.mark_paid.assert_called_once_with(record.id)
 
     def test_pay_card_not_liability_account(
         self, use_case, mock_uow, mock_account_repo

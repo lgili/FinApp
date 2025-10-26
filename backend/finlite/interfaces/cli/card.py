@@ -1,28 +1,24 @@
-"""
-Card commands - Credit card management.
+"""CLI commands for credit card management."""
 
-Commands:
-    fin card statement  - Generate credit card statement
-    fin card pay        - Pay credit card invoice
-"""
+from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Callable, Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from finlite.application.use_cases.build_card_statement import (
     BuildCardStatementCommand,
     BuildCardStatementUseCase,
+    CardStatementResult,
 )
-from finlite.application.use_cases.pay_card import (
-    PayCardCommand,
-    PayCardUseCase,
-)
+from finlite.application.use_cases.list_accounts import ListAccountsUseCase
+from finlite.application.use_cases.pay_card import PayCardCommand, PayCardUseCase
+from finlite.domain.value_objects.account_type import AccountType
 from finlite.shared.di import Container
 from finlite.shared.observability import get_logger
 
@@ -30,171 +26,100 @@ logger = get_logger(__name__)
 console = Console()
 
 
-def register_commands(
-    app: typer.Typer,
-    get_container: Callable[[], Container],
-) -> None:
-    """
-    Register card commands to the Typer app.
+def register_commands(app: typer.Typer, get_container: Callable[[], Container]) -> None:
+    """Register Typer commands for credit card flows."""
 
-    Args:
-        app: Typer app instance
-        get_container: Function to get DI container
-    """
+    @app.command("list")
+    def list_cards() -> None:
+        """List all configured credit card accounts and their metadata."""
 
-    @app.command("statement")
+        container = get_container()
+        use_case: ListAccountsUseCase = container.list_accounts_use_case()
+        accounts = use_case.execute(account_type=AccountType.LIABILITY)
+        card_accounts = [acc for acc in accounts if acc.card_issuer]
+
+        if not card_accounts:
+            console.print("[yellow]No credit card accounts configured yet.[/yellow]")
+            console.print(
+                "[dim]Create one with --card-issuer, --card-closing-day, and --card-due-day.[/dim]"
+            )
+            return
+
+        table = Table(title=f"Credit Cards ({len(card_accounts)} accounts)")
+        table.add_column("Code", style="cyan")
+        table.add_column("Issuer", style="magenta")
+        table.add_column("Closing Day", justify="right")
+        table.add_column("Due Day", justify="right")
+
+        for acc in card_accounts:
+            table.add_row(
+                acc.code,
+                acc.card_issuer or "-",
+                str(acc.card_closing_day or "-"),
+                str(acc.card_due_day or "-"),
+            )
+
+        console.print(table)
+
+    def _run_build_statement(
+        container: Container,
+        card_account: str,
+        period: str | None,
+        currency: str,
+        show_items: bool,
+    ) -> None:
+        period_date = _parse_period(period)
+        use_case: BuildCardStatementUseCase = container.build_card_statement_use_case()
+        command = BuildCardStatementCommand(
+            card_account_code=card_account,
+            period=period_date,
+            currency=currency.upper(),
+        )
+        result = use_case.execute(command)
+        _render_statement(result, show_items)
+
+    @app.command("build-statement")
     def build_statement(
         card_account: Annotated[
             str,
-            typer.Option("--card", "-c", help="Credit card account code (e.g., Liabilities:CreditCard:Nubank)"),
+            typer.Option("--card", "-c", help="Credit card account code"),
         ],
-        from_date: Annotated[
+        period: Annotated[
             Optional[str],
-            typer.Option("--from", "-f", help="Start date (YYYY-MM-DD)"),
-        ] = None,
-        to_date: Annotated[
-            Optional[str],
-            typer.Option("--to", "-t", help="End date (YYYY-MM-DD)"),
+            typer.Option("--period", "-p", help="Statement period (YYYY-MM)"),
         ] = None,
         currency: Annotated[
             str,
-            typer.Option("--currency", help="Currency (BRL, USD, etc)"),
+            typer.Option("--currency", help="Currency filter"),
         ] = "BRL",
-    ):
-        """
-        Generate credit card statement for a period.
+        show_items: Annotated[
+            bool,
+            typer.Option("--show-items/--no-show-items", help="Toggle charges table"),
+        ] = True,
+    ) -> None:
+        """Generate and persist a credit card statement for the target period."""
 
-        Shows all charges (purchases) made with the credit card,
-        organized by date and category. Useful for reviewing
-        expenses before paying the invoice.
-
-        Examples:
-            $ fin card statement --card Liabilities:CreditCard:Nubank
-            $ fin card statement -c Liabilities:CreditCard:Nubank --from 2025-10-01 --to 2025-10-31
-            $ fin card statement -c Liabilities:CreditCard:Nubank --currency USD
-        """
         container = get_container()
-        use_case: BuildCardStatementUseCase = container.build_card_statement_use_case()
-
-        # Parse dates
         try:
-            from_dt = (
-                datetime.strptime(from_date, "%Y-%m-%d")
-                if from_date
-                else datetime(2000, 1, 1)
-            )
-            to_dt = (
-                datetime.strptime(to_date, "%Y-%m-%d") if to_date else datetime.now()
-            )
-        except ValueError as e:
-            console.print(f"[red]Invalid date format:[/red] {e}")
-            console.print("[dim]Use YYYY-MM-DD format (e.g., 2025-10-01)[/dim]")
-            raise typer.Exit(code=1)
+            _run_build_statement(container, card_account, period, currency, show_items)
+        except ValueError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1)
 
-        console.print(f"[cyan]Generating credit card statement...[/cyan]")
-        console.print(f"[dim]Card: {card_account}[/dim]")
-        console.print(f"[dim]Period: {from_dt.date()} to {to_dt.date()}[/dim]")
-
-        try:
-            # Execute use case
-            command = BuildCardStatementCommand(
-                card_account_code=card_account,
-                from_date=from_dt,
-                to_date=to_dt,
-                currency=currency.upper(),
-            )
-
-            result = use_case.execute(command)
-
-            # Show summary
-            console.print()
-            console.print(
-                Panel.fit(
-                    f"[bold]Card:[/bold] {result.card_account_name}\n"
-                    f"[bold]Account:[/bold] {result.card_account_code}\n"
-                    f"[bold]Period:[/bold] {result.from_date.date()} to {result.to_date.date()}\n"
-                    f"[bold]Currency:[/bold] {result.currency}\n\n"
-                    f"[bold]Previous Balance:[/bold] {result.previous_balance:,.2f} {result.currency}\n"
-                    f"[bold]New Charges:[/bold] [red]{result.total_amount:,.2f}[/red] {result.currency}\n"
-                    f"[bold]Total Purchases:[/bold] {result.item_count} transactions\n\n"
-                    f"[bold]TOTAL TO PAY:[/bold] [bold red]{result.previous_balance + result.total_amount:,.2f}[/bold red] {result.currency}",
-                    title="Credit Card Statement",
-                    border_style="red",
-                )
-            )
-
-            # Items table
-            if result.items:
-                console.print()
-                items_table = Table(
-                    title=f"Charges ({result.item_count} transactions)",
-                    show_header=True,
-                    header_style="bold red",
-                )
-
-                items_table.add_column("Date", style="cyan", width=12)
-                items_table.add_column("Description", style="white", width=40)
-                items_table.add_column(
-                    "Amount", justify="right", style="red", width=15
-                )
-                items_table.add_column("Category", style="dim", width=30)
-
-                for item in result.items:
-                    items_table.add_row(
-                        str(item.date),
-                        item.description,
-                        f"{item.amount:,.2f}",
-                        item.category_code,
-                    )
-
-                # Add total row
-                items_table.add_section()
-                items_table.add_row(
-                    "",
-                    "[bold]TOTAL",
-                    f"[bold red]{result.total_amount:,.2f}",
-                    "",
-                )
-
-                console.print(items_table)
-            else:
-                console.print()
-                console.print(
-                    "[yellow]No charges found in this period.[/yellow]"
-                )
-                console.print(
-                    "[dim]The card has no purchases in the specified date range[/dim]"
-                )
-
-            console.print()
-            console.print("[green]✓ Statement generated successfully[/green]")
-
-        except ValueError as e:
-            console.print(f"[red]✗ Error:[/red] {e}")
-            logger.error("build_statement_failed", error=str(e))
-            raise typer.Exit(code=1)
-        except Exception as e:
-            console.print(f"[red]✗ Failed to generate statement:[/red] {e}")
-            logger.error("build_statement_failed", error=str(e), exc_info=True)
-            raise typer.Exit(code=1)
+    @app.command("statement")
+    def deprecated_statement(**kwargs) -> None:  # pragma: no cover - compatibility wrapper
+        console.print("[yellow]`fin card statement` is deprecated. Use `fin card build-statement`.[/yellow]")
+        build_statement(**kwargs)
 
     @app.command("pay")
-    def pay_invoice(
+    def pay_statement(
         card_account: Annotated[
             str,
-            typer.Option(
-                "--card",
-                "-c",
-                help="Credit card account code (e.g., Liabilities:CreditCard:Nubank)",
-            ),
+            typer.Option("--card", "-c", help="Credit card account code"),
         ],
         payment_account: Annotated[
             str,
-            typer.Option(
-                "--from",
-                "-f",
-                help="Payment source account (e.g., Assets:Checking)",
-            ),
+            typer.Option("--from", "-f", help="Funding account code"),
         ],
         amount: Annotated[
             float,
@@ -202,91 +127,107 @@ def register_commands(
         ],
         currency: Annotated[
             str,
-            typer.Option("--currency", help="Currency (BRL, USD, etc)"),
+            typer.Option("--currency", help="Currency"),
         ] = "BRL",
-        date: Annotated[
+        payment_date: Annotated[
             Optional[str],
-            typer.Option("--date", "-d", help="Payment date (YYYY-MM-DD, default: today)"),
+            typer.Option("--date", help="Payment date (YYYY-MM-DD)"),
         ] = None,
         description: Annotated[
-            str,
-            typer.Option(
-                "--description", help="Payment description"
-            ),
-        ] = "Credit card payment",
-    ):
-        """
-        Pay credit card invoice.
+            Optional[str],
+            typer.Option("--description", help="Payment description"),
+        ] = None,
+    ) -> None:
+        """Register a credit card payment."""
 
-        Creates a transaction that transfers money from a bank account (ASSET)
-        to the credit card (LIABILITY), reducing the debt.
+        try:
+            when = datetime.strptime(payment_date, "%Y-%m-%d") if payment_date else datetime.now()
+        except ValueError as exc:
+            console.print(f"[red]Invalid date:[/red] {exc}")
+            raise typer.Exit(1)
 
-        Examples:
-            $ fin card pay -c Liabilities:CreditCard:Nubank -f Assets:Checking -a 1500.00
-            $ fin card pay -c Liabilities:CreditCard:Nubank -f Assets:Checking -a 2500.00 --date 2025-10-15
-            $ fin card pay -c Liabilities:CreditCard:Nubank -f Assets:Checking -a 1000.00 --description "Partial payment"
-        """
         container = get_container()
         use_case: PayCardUseCase = container.pay_card_use_case()
 
-        # Parse date
-        try:
-            payment_date = (
-                datetime.strptime(date, "%Y-%m-%d") if date else datetime.now()
-            )
-        except ValueError as e:
-            console.print(f"[red]Invalid date format:[/red] {e}")
-            console.print("[dim]Use YYYY-MM-DD format (e.g., 2025-10-15)[/dim]")
-            raise typer.Exit(code=1)
-
-        # Validate amount
-        if amount <= 0:
-            console.print("[red]Payment amount must be positive[/red]")
-            raise typer.Exit(code=1)
-
-        console.print(f"[cyan]Processing credit card payment...[/cyan]")
-        console.print(f"[dim]Card: {card_account}[/dim]")
-        console.print(f"[dim]From: {payment_account}[/dim]")
-        console.print(f"[dim]Amount: {amount:,.2f} {currency}[/dim]")
-        console.print(f"[dim]Date: {payment_date.date()}[/dim]")
+        command = PayCardCommand(
+            card_account_code=card_account,
+            payment_account_code=payment_account,
+            amount=Decimal(str(amount)),
+            currency=currency.upper(),
+            date=when,
+            description=description or "Credit card payment",
+        )
 
         try:
-            # Execute use case
-            command = PayCardCommand(
-                card_account_code=card_account,
-                payment_account_code=payment_account,
-                amount=Decimal(str(amount)),
-                currency=currency.upper(),
-                date=payment_date,
-                description=description,
-            )
-
             result = use_case.execute(command)
+        except ValueError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1)
 
-            # Show success
-            console.print()
-            console.print(
-                Panel.fit(
-                    f"[bold]Payment Successful[/bold]\n\n"
-                    f"[bold]Transaction ID:[/bold] {result.transaction_id}\n"
-                    f"[bold]Card:[/bold] {result.card_account_code}\n"
-                    f"[bold]From:[/bold] {result.payment_account_code}\n"
-                    f"[bold]Amount:[/bold] [green]{result.amount:,.2f}[/green] {result.currency}\n"
-                    f"[bold]Date:[/bold] {result.date.date()}\n\n"
-                    f"[dim]The payment has been recorded and the card balance has been updated.[/dim]",
-                    title="Payment Confirmation",
-                    border_style="green",
-                )
+        console.print(
+            Panel.fit(
+                f"[bold]Payment recorded[/bold]\n"
+                f"Card: {result.card_account_code}\n"
+                f"From: {result.payment_account_code}\n"
+                f"Amount: {result.amount:,.2f} {result.currency}\n"
+                f"Date: {result.date.strftime('%Y-%m-%d')}\n",
+                border_style="green",
+            )
+        )
+
+    def _parse_period(period: Optional[str]) -> date:
+        if period is None:
+            today = datetime.now().date()
+            return today.replace(day=1)
+        try:
+            parsed = datetime.strptime(period, "%Y-%m")
+        except ValueError as exc:  # pragma: no cover - guard
+            raise ValueError(f"Invalid period '{period}': {exc}")
+        return parsed.date().replace(day=1)
+
+    def _render_statement(result: CardStatementResult, show_items: bool) -> None:
+        console.print(
+            Panel.fit(
+                f"[bold]Card:[/bold] {result.card_account_name}\n"
+                f"[bold]Account Code:[/bold] {result.card_account_code}\n"
+                f"[bold]Period:[/bold] {result.period_start:%Y-%m-%d} → {result.period_end:%Y-%m-%d}\n"
+                f"[bold]Closing Day:[/bold] {result.closing_day}\n"
+                f"[bold]Due Date:[/bold] {result.due_date:%Y-%m-%d}\n"
+                f"[bold]Status:[/bold] {result.status.value}\n\n"
+                f"[bold]Previous Balance:[/bold] {result.previous_balance:,.2f} {result.currency}\n"
+                f"[bold]New Charges:[/bold] {result.charges_total:,.2f} {result.currency}\n"
+                f"[bold red]Total Due:[/bold red] {result.total_due:,.2f} {result.currency}",
+                title="Credit Card Statement",
+                border_style="red",
+            )
+        )
+
+        if not show_items:
+            console.print("[dim]Use --show-items to list individual charges.[/dim]")
+            return
+
+        if not result.items:
+            console.print("[yellow]No purchases for this period.[/yellow]")
+            return
+
+        table = Table(title=f"Charges ({len(result.items)} items)")
+        table.add_column("Date", style="cyan")
+        table.add_column("Description", style="white")
+        table.add_column("Amount", justify="right", style="red")
+        table.add_column("Category", style="dim")
+        table.add_column("Installment", style="magenta")
+
+        for item in result.items:
+            if item.installment_number and item.installment_total:
+                installment_label = f"{item.installment_number}/{item.installment_total}"
+            else:
+                installment_label = "-"
+            table.add_row(
+                item.occurred_at.strftime("%Y-%m-%d"),
+                item.description,
+                f"{item.amount:,.2f}",
+                item.category_code,
+                installment_label,
             )
 
-            console.print()
-            console.print("[green]✓ Payment processed successfully[/green]")
-
-        except ValueError as e:
-            console.print(f"[red]✗ Error:[/red] {e}")
-            logger.error("pay_card_failed", error=str(e))
-            raise typer.Exit(code=1)
-        except Exception as e:
-            console.print(f"[red]✗ Failed to process payment:[/red] {e}")
-            logger.error("pay_card_failed", error=str(e), exc_info=True)
-            raise typer.Exit(code=1)
+        console.print(table)

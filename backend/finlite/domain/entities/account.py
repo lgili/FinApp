@@ -74,6 +74,9 @@ class Account:
     currency: str
     parent_id: Optional[UUID] = None
     is_active: bool = True
+    card_issuer: Optional[str] = None
+    card_closing_day: Optional[int] = None
+    card_due_day: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -82,6 +85,7 @@ class Account:
         self._validate_code()
         self._validate_name()
         self._validate_currency()
+        self._validate_card_metadata()
 
     @classmethod
     def create(
@@ -91,6 +95,9 @@ class Account:
         account_type: AccountType,
         currency: str,
         parent_id: Optional[UUID] = None,
+        card_issuer: Optional[str] = None,
+        card_closing_day: Optional[int] = None,
+        card_due_day: Optional[int] = None,
     ) -> Account:
         """
         Factory method para criar nova conta.
@@ -120,6 +127,9 @@ class Account:
             account_type=account_type,
             currency=currency,
             parent_id=parent_id,
+            card_issuer=card_issuer,
+            card_closing_day=card_closing_day,
+            card_due_day=card_due_day,
         )
 
     def rename(self, new_name: str) -> None:
@@ -178,6 +188,56 @@ class Account:
         """
         self.is_active = True
         self.updated_at = datetime.utcnow()
+
+    def update_card_metadata(
+        self,
+        issuer: Optional[str],
+        closing_day: Optional[int],
+        due_day: Optional[int],
+    ) -> None:
+        """Atualiza metadados de cartão de crédito."""
+        self.card_issuer = issuer
+        self.card_closing_day = closing_day
+        self.card_due_day = due_day
+        self._validate_card_metadata()
+        self.updated_at = datetime.utcnow()
+
+    def has_card_metadata(self) -> bool:
+        """Retorna True se metadados de cartão estiverem configurados."""
+        return (
+            self.card_issuer is not None
+            and self.card_closing_day is not None
+            and self.card_due_day is not None
+        )
+
+    def _validate_card_metadata(self) -> None:
+        """Valida metadados específicos de cartão de crédito."""
+        # Se não for liability, zera metadados
+        if self.account_type != AccountType.LIABILITY:
+            if any(
+                value is not None
+                for value in (self.card_issuer, self.card_closing_day, self.card_due_day)
+            ):
+                raise ValueError(
+                    "Card metadata can only be set for LIABILITY accounts"
+                )
+            return
+
+        if self.card_issuer is None and self.card_closing_day is None and self.card_due_day is None:
+            # Metadados opcionais; sem dados não há validação
+            return
+
+        if not self.card_issuer or not self.card_issuer.strip():
+            raise ValueError("card_issuer must be provided for credit card accounts")
+
+        for field_name, value in (
+            ("card_closing_day", self.card_closing_day),
+            ("card_due_day", self.card_due_day),
+        ):
+            if value is None:
+                raise ValueError(f"{field_name} must be provided for credit card accounts")
+            if not 1 <= value <= 31:
+                raise ValueError(f"{field_name} must be between 1 and 31")
 
     def change_parent(self, new_parent_id: Optional[UUID]) -> None:
         """
