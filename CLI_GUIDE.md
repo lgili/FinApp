@@ -514,6 +514,216 @@ Net Income: 2,700.00
   fin report income-statement --from 2025-10-01 --to 2025-12-31 --compare previous
   ```
 
+### Balance Sheet
+
+Generate a balance sheet snapshot showing assets, liabilities, and equity as of a specific date:
+
+```bash
+# Basic balance sheet as of today
+fin report balance-sheet
+
+# Specific date
+fin report balance-sheet --at 2025-10-31
+
+# Different currency
+fin report balance-sheet --at 2025-10-31 --currency USD
+
+# Summary only (no per-account details)
+fin report balance-sheet --at 2025-10-31 --summary
+```
+
+**Options:**
+- `--at` (optional): Effective date (YYYY-MM-DD, default: today)
+- `--currency, -c` (optional): Currency code (default: BRL)
+- `--details/--summary` (optional): Show per-account breakdown or just totals (default: details)
+- `--compare` (optional): Comparison mode - `previous` (previous month) or custom date (YYYY-MM-DD)
+- `--export` (optional): Export to file (CSV or Markdown): e.g., `balance-sheet.csv` or `balance-sheet.md`
+- `--chart` (optional): Show visual chart of assets/liabilities/equity
+
+**Example Output:**
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              Balance Sheet Summary                       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ As of: 2025-10-31                                        │
+│ Currency: BRL                                             │
+│                                                           │
+│ Total Assets: 15,000.00 BRL                              │
+│ Total Liabilities: 5,000.00 BRL                          │
+│ Total Equity: 10,000.00 BRL                              │
+│ Net Worth: 10,000.00 BRL                                 │
+└───────────────────────────────────────────────────────────┘
+
+                      Asset Accounts
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Account               ┃ Balance      ┃ Postings ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ Assets:Bank:Checking  │ 12,000.00    │       25 │
+│ Assets:Cash           │  3,000.00    │       12 │
+└───────────────────────┴──────────────┴──────────┘
+
+                    Liability Accounts
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Account               ┃ Balance      ┃ Postings ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ Liabilities:CreditCard│  5,000.00    │        8 │
+└───────────────────────┴──────────────┴──────────┘
+
+                      Equity Accounts
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Account               ┃ Balance      ┃ Postings ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ Equity:Opening        │ 10,000.00    │        1 │
+└───────────────────────┴──────────────┴──────────┘
+```
+
+#### Comparison Modes
+
+Compare balance sheet positions across time:
+
+```bash
+# Compare to previous month
+fin report balance-sheet --at 2025-10-31 --compare previous
+
+# Compare to specific custom date
+fin report balance-sheet --at 2025-10-31 --compare 2025-09-30
+```
+
+**Example Output with Comparison:**
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              Balance Sheet Summary                       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ As of: 2025-10-31                                        │
+│ Currency: BRL                                             │
+│                                                           │
+│ Total Assets: 15,000.00 BRL                              │
+│ Total Liabilities: 5,000.00 BRL                          │
+│ Total Equity: 10,000.00 BRL                              │
+│ Net Worth: 10,000.00 BRL                                 │
+│                                                           │
+│ Comparison Date: 2025-09-30                              │
+│ Net Worth Change: ▲ 2,000.00 (+20.0%)                   │
+└───────────────────────────────────────────────────────────┘
+
+                      Asset Accounts
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+┃ Account           ┃ Balance  ┃ Postings ┃ Comparison        ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+│ Assets:Bank       │ 15,000   │    25    │ 13,000 → ▲ 2,000 │
+│                   │          │          │ (+15.4%)          │
+└───────────────────┴──────────┴──────────┴───────────────────┘
+```
+
+#### Export Options
+
+Export balance sheet to CSV or Markdown for record-keeping:
+
+```bash
+# Export to CSV
+fin report balance-sheet --at 2025-10-31 --export balance-sheet-oct.csv
+
+# Export to Markdown
+fin report balance-sheet --at 2025-10-31 --export balance-sheet-oct.md
+
+# Export with comparison
+fin report balance-sheet --at 2025-10-31 --compare previous --export balance-sheet-comparison.csv
+```
+
+**CSV Output Example:**
+```csv
+Balance Sheet Report
+As of: 2025-10-31,Currency: BRL
+
+ASSETS
+Account Code,Account Name,Balance,Transactions
+Assets:Bank:Checking,Checking,12000.00,25
+Assets:Cash,Cash,3000.00,12
+Total Assets,,15000.00,
+
+LIABILITIES
+Account Code,Account Name,Balance,Transactions
+Liabilities:CreditCard,Credit Card,5000.00,8
+Total Liabilities,,5000.00,
+
+EQUITY
+Account Code,Account Name,Balance,Transactions
+Equity:Opening,Opening Balances,10000.00,1
+Total Equity,,10000.00,
+
+NET WORTH,,10000.00,
+```
+
+#### Visual Charts
+
+Display a simple visualization:
+
+```bash
+fin report balance-sheet --at 2025-10-31 --chart
+```
+
+**Example Output:**
+```
+Balance Sheet Visualization
+
+Assets      (15,000.00):
+██████████████████████████████████████████████████
+
+Liabilities (5,000.00):
+████████████████
+
+Equity      (10,000.00):
+█████████████████████████████████
+
+Net Worth: 10,000.00
+```
+
+#### Interpretation Tips
+
+**Understanding the Report:**
+
+1. **Assets Section**: Shows what you own
+   - Cash, bank accounts, investments, property, etc.
+   - Positive balance = resources available
+   - Sorted by balance (largest first)
+
+2. **Liabilities Section**: Shows what you owe
+   - Loans, credit cards, mortgages, etc.
+   - Positive balance = amounts owed
+   - Track debt over time
+
+3. **Equity Section**: Shows net worth origin
+   - Opening balances, retained earnings
+   - Represents accumulated wealth
+   - Should equal Assets - Liabilities
+
+4. **Net Worth**: Assets - Liabilities
+   - Key indicator of financial health
+   - Track growth over time
+   - Compare month-over-month
+
+**Common Use Cases:**
+
+- **Monthly Snapshots**: Track wealth growth over time
+  ```bash
+  fin report balance-sheet --at 2025-10-31 --compare previous
+  ```
+
+- **Year-End Review**: Annual financial position
+  ```bash
+  fin report balance-sheet --at 2025-12-31 --export year-end-2025.csv
+  ```
+
+- **Debt Tracking**: Monitor liability reduction
+  ```bash
+  fin report balance-sheet --at 2025-10-31 --compare 2025-01-01
+  ```
+
+- **Investment Analysis**: Track asset growth
+  ```bash
+  fin report balance-sheet --at 2025-10-31 --chart
+  ```
+
 ## Examples
 
 ### Basic Setup

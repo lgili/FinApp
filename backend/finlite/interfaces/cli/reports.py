@@ -21,6 +21,7 @@ from finlite.application.use_cases.generate_balance_sheet_report import (
     GenerateBalanceSheetReportUseCase,
     GenerateBalanceSheetCommand,
     BalanceSheetAccountRow,
+    ComparisonMode as BalanceSheetComparisonMode,
 )
 from finlite.application.use_cases.generate_cashflow_report import (
     GenerateCashflowReportUseCase,
@@ -68,12 +69,39 @@ def register_commands(
                 help="Show per-account breakdown tables",
             ),
         ] = True,
+        compare: Annotated[
+            Optional[str],
+            typer.Option(
+                "--compare",
+                help="Comparison mode: 'previous' (previous month) or custom date (YYYY-MM-DD)",
+            ),
+        ] = None,
+        export: Annotated[
+            Optional[str],
+            typer.Option(
+                "--export",
+                help="Export to file (CSV or Markdown): e.g., balance-sheet.csv or balance-sheet.md",
+            ),
+        ] = None,
+        chart: Annotated[
+            bool,
+            typer.Option("--chart", help="Show visual chart of assets/liabilities/equity"),
+        ] = False,
     ):
         """
         Generate a balance sheet snapshot as of a specific date.
 
         Summarizes totals for Assets, Liabilities, and Equity and optionally
-        renders per-account breakdown tables.
+        renders per-account breakdown tables. Supports comparison to previous month
+        or custom date, CSV/Markdown export, and visual charts.
+
+        Examples:
+            $ fin report balance-sheet
+            $ fin report balance-sheet --at 2025-10-31
+            $ fin report balance-sheet --at 2025-10-31 --compare previous
+            $ fin report balance-sheet --at 2025-10-31 --compare 2025-09-30
+            $ fin report balance-sheet --export balance-sheet.csv
+            $ fin report balance-sheet --chart
         """
         container = get_container()
         use_case: GenerateBalanceSheetReportUseCase = (
@@ -90,6 +118,25 @@ def register_commands(
             console.print("[dim]Use YYYY-MM-DD format (e.g., 2025-10-31)[/dim]")
             raise typer.Exit(code=1)
 
+        # Parse comparison mode
+        comparison_mode = BalanceSheetComparisonMode.NONE
+        comparison_date = None
+        if compare:
+            compare_lower = compare.lower()
+            if compare_lower in ("previous", "prev", "p"):
+                comparison_mode = BalanceSheetComparisonMode.PREVIOUS_MONTH
+            else:
+                # Try parsing as custom date
+                try:
+                    comparison_date = datetime.strptime(compare, "%Y-%m-%d").date()
+                    comparison_mode = BalanceSheetComparisonMode.CUSTOM_DATE
+                except ValueError:
+                    console.print(
+                        f"[red]Invalid comparison value:[/red] {compare}\n"
+                        "[dim]Use 'previous' or a date in YYYY-MM-DD format[/dim]"
+                    )
+                    raise typer.Exit(code=1)
+
         console.print("[cyan]Generating balance sheet report...[/cyan]")
         console.print(
             f"[dim]As of: {as_of.isoformat()} | Currency: {currency.upper()}[/dim]"
@@ -99,10 +146,25 @@ def register_commands(
             style = positive_style if amount >= 0 else "red"
             return f"[{style}]{amount:,.2f}[/{style}] {curr}"
 
+        def _format_comparison(row: BalanceSheetAccountRow) -> str:
+            """Format comparison data if available."""
+            if row.comparison_balance is None:
+                return ""
+
+            change_icon = "▲" if row.change_amount >= 0 else "▼"
+            change_color = "green" if row.change_amount >= 0 else "red"
+
+            return (
+                f"[dim]{row.comparison_balance:,.2f}[/dim] → "
+                f"[{change_color}]{change_icon} {abs(row.change_amount):,.2f} "
+                f"({row.change_percent:+.1f}%)[/{change_color}]"
+            )
+
         def _render_section(
             title: str,
             rows: list[BalanceSheetAccountRow],
             positive_style: str,
+            show_comparison: bool = False,
         ) -> None:
             if not details or not rows:
                 return
@@ -116,59 +178,252 @@ def register_commands(
             table.add_column("Balance", justify="right", style=positive_style)
             table.add_column("Postings", justify="right", style="dim")
 
+            if show_comparison:
+                table.add_column("Comparison", justify="right", style="dim")
+
             for row in rows:
-                table.add_row(
+                columns = [
                     row.account_code,
                     _format_amount(row.balance, result.currency, positive_style),
                     str(row.transaction_count),
-                )
+                ]
+
+                if show_comparison:
+                    columns.append(_format_comparison(row))
+
+                table.add_row(*columns)
 
             console.print()
             console.print(table)
+
+        def _export_to_csv(filename: str) -> None:
+            """Export report to CSV file."""
+            path = Path(filename)
+            with path.open("w", newline="") as f:
+                writer = csv.writer(f)
+
+                # Header
+                writer.writerow(["Balance Sheet Report"])
+                writer.writerow([f"As of: {result.as_of}", f"Currency: {result.currency}"])
+                if result.comparison_date:
+                    writer.writerow([f"Comparison Date: {result.comparison_date}"])
+                writer.writerow([])
+
+                # Assets section
+                writer.writerow(["ASSETS"])
+                headers = ["Account Code", "Account Name", "Balance", "Transactions"]
+                if result.comparison_date:
+                    headers.extend(["Comparison Balance", "Change", "Change %"])
+                writer.writerow(headers)
+                for row in result.assets:
+                    row_data = [row.account_code, row.account_name, f"{row.balance:.2f}", row.transaction_count]
+                    if result.comparison_date and row.comparison_balance is not None:
+                        row_data.extend([
+                            f"{row.comparison_balance:.2f}",
+                            f"{row.change_amount:.2f}",
+                            f"{row.change_percent:.2f}%" if row.change_percent else "N/A"
+                        ])
+                    writer.writerow(row_data)
+                writer.writerow(["Total Assets", "", f"{result.assets_total:.2f}", ""])
+                writer.writerow([])
+
+                # Liabilities section
+                writer.writerow(["LIABILITIES"])
+                writer.writerow(headers)
+                for row in result.liabilities:
+                    row_data = [row.account_code, row.account_name, f"{row.balance:.2f}", row.transaction_count]
+                    if result.comparison_date and row.comparison_balance is not None:
+                        row_data.extend([
+                            f"{row.comparison_balance:.2f}",
+                            f"{row.change_amount:.2f}",
+                            f"{row.change_percent:.2f}%" if row.change_percent else "N/A"
+                        ])
+                    writer.writerow(row_data)
+                writer.writerow(["Total Liabilities", "", f"{result.liabilities_total:.2f}", ""])
+                writer.writerow([])
+
+                # Equity section
+                writer.writerow(["EQUITY"])
+                writer.writerow(headers)
+                for row in result.equity:
+                    row_data = [row.account_code, row.account_name, f"{row.balance:.2f}", row.transaction_count]
+                    if result.comparison_date and row.comparison_balance is not None:
+                        row_data.extend([
+                            f"{row.comparison_balance:.2f}",
+                            f"{row.change_amount:.2f}",
+                            f"{row.change_percent:.2f}%" if row.change_percent else "N/A"
+                        ])
+                    writer.writerow(row_data)
+                writer.writerow(["Total Equity", "", f"{result.equity_total:.2f}", ""])
+                writer.writerow([])
+
+                # Net Worth
+                writer.writerow(["NET WORTH", "", f"{result.net_worth:.2f}", ""])
+
+            console.print(f"[green]✓ Report exported to:[/green] {path.absolute()}")
+
+        def _export_to_markdown(filename: str) -> None:
+            """Export report to Markdown file."""
+            path = Path(filename)
+            with path.open("w") as f:
+                f.write(f"# Balance Sheet Report\n\n")
+                f.write(f"**As of:** {result.as_of}  \n")
+                f.write(f"**Currency:** {result.currency}  \n")
+                if result.comparison_date:
+                    f.write(f"**Comparison Date:** {result.comparison_date}  \n")
+                f.write("\n")
+
+                # Assets section
+                f.write("## Assets\n\n")
+                f.write("| Account Code | Account Name | Balance | Transactions |\n")
+                f.write("|--------------|--------------|---------|-------------|\n")
+                for row in result.assets:
+                    f.write(
+                        f"| {row.account_code} | {row.account_name} | "
+                        f"{row.balance:,.2f} | {row.transaction_count} |\n"
+                    )
+                f.write(f"| **Total Assets** | | **{result.assets_total:,.2f}** | |\n\n")
+
+                # Liabilities section
+                f.write("## Liabilities\n\n")
+                f.write("| Account Code | Account Name | Balance | Transactions |\n")
+                f.write("|--------------|--------------|---------|-------------|\n")
+                for row in result.liabilities:
+                    f.write(
+                        f"| {row.account_code} | {row.account_name} | "
+                        f"{row.balance:,.2f} | {row.transaction_count} |\n"
+                    )
+                f.write(f"| **Total Liabilities** | | **{result.liabilities_total:,.2f}** | |\n\n")
+
+                # Equity section
+                f.write("## Equity\n\n")
+                f.write("| Account Code | Account Name | Balance | Transactions |\n")
+                f.write("|--------------|--------------|---------|-------------|\n")
+                for row in result.equity:
+                    f.write(
+                        f"| {row.account_code} | {row.account_name} | "
+                        f"{row.balance:,.2f} | {row.transaction_count} |\n"
+                    )
+                f.write(f"| **Total Equity** | | **{result.equity_total:,.2f}** | |\n\n")
+
+                # Summary
+                f.write("## Summary\n\n")
+                f.write(f"| Metric | Amount |\n")
+                f.write(f"|--------|--------|\n")
+                f.write(f"| Total Assets | {result.assets_total:,.2f} |\n")
+                f.write(f"| Total Liabilities | {result.liabilities_total:,.2f} |\n")
+                f.write(f"| Total Equity | {result.equity_total:,.2f} |\n")
+                f.write(f"| **Net Worth** | **{result.net_worth:,.2f}** |\n")
+
+            console.print(f"[green]✓ Report exported to:[/green] {path.absolute()}")
+
+        def _show_chart() -> None:
+            """Show a simple ASCII chart of assets/liabilities/equity."""
+            console.print()
+            console.print("[bold]Balance Sheet Visualization[/bold]")
+
+            # Simple text-based visualization
+            max_val = max(
+                float(result.assets_total),
+                float(result.liabilities_total),
+                float(result.equity_total),
+            )
+            if max_val > 0:
+                assets_bar = "█" * int((float(result.assets_total) / max_val) * 50)
+                liabilities_bar = "█" * int((float(result.liabilities_total) / max_val) * 50)
+                equity_bar = "█" * int((float(result.equity_total) / max_val) * 50)
+
+                console.print()
+                console.print(f"[green]Assets      ({result.assets_total:,.2f}):[/green]")
+                console.print(f"[green]{assets_bar}[/green]")
+                console.print()
+                console.print(f"[yellow]Liabilities ({result.liabilities_total:,.2f}):[/yellow]")
+                console.print(f"[yellow]{liabilities_bar}[/yellow]")
+                console.print()
+                console.print(f"[blue]Equity      ({result.equity_total:,.2f}):[/blue]")
+                console.print(f"[blue]{equity_bar}[/blue]")
+                console.print()
+
+                net_color = "green" if result.net_worth >= 0 else "red"
+                console.print(f"[{net_color}]Net Worth: {result.net_worth:,.2f}[/{net_color}]")
 
         try:
             command = GenerateBalanceSheetCommand(
                 as_of=as_of,
                 currency=currency.upper(),
+                comparison_mode=comparison_mode,
+                comparison_date=comparison_date,
             )
             result = use_case.execute(command)
 
+            # Display summary panel
             console.print()
-            summary_table = Table(
-                title=f"Balance Sheet — {result.as_of.isoformat()}",
-                show_header=False,
-                header_style="bold",
-            )
-            summary_table.add_column("Section", style="cyan", no_wrap=True)
-            summary_table.add_column("Total", justify="right", style="bold")
+            summary_lines = [
+                f"[bold]As of:[/bold] {result.as_of}",
+                f"[bold]Currency:[/bold] {result.currency}",
+                "",
+                f"[bold]Total Assets:[/bold] [green]{result.assets_total:,.2f}[/green] {result.currency}",
+                f"[bold]Total Liabilities:[/bold] [yellow]{result.liabilities_total:,.2f}[/yellow] {result.currency}",
+                f"[bold]Total Equity:[/bold] [blue]{result.equity_total:,.2f}[/blue] {result.currency}",
+            ]
 
-            summary_table.add_row(
-                "Assets",
-                _format_amount(result.assets_total, result.currency, "green"),
-            )
-            summary_table.add_row(
-                "Liabilities",
-                _format_amount(result.liabilities_total, result.currency, "yellow"),
-            )
-            summary_table.add_row(
-                "Equity",
-                _format_amount(result.equity_total, result.currency, "blue"),
-            )
-            summary_table.add_row(
-                "Net Worth",
-                _format_amount(result.net_worth, result.currency, "green"),
+            net_color = "green" if result.net_worth >= 0 else "red"
+            summary_lines.append(
+                f"[bold]Net Worth:[/bold] [{net_color}]{result.net_worth:,.2f}[/{net_color}] {result.currency}"
             )
 
-            console.print(summary_table)
+            if result.comparison_date:
+                summary_lines.append("")
+                summary_lines.append(f"[dim]Comparison Date: {result.comparison_date}[/dim]")
+                if result.comparison_net_worth is not None:
+                    net_change = result.net_worth - result.comparison_net_worth
+                    net_pct = (
+                        (net_change / abs(result.comparison_net_worth) * Decimal("100"))
+                        if result.comparison_net_worth != 0
+                        else Decimal("0")
+                    )
+                    change_icon = "▲" if net_change >= 0 else "▼"
+                    change_color = "green" if net_change >= 0 else "red"
+                    summary_lines.append(
+                        f"[dim]Net Worth Change:[/dim] [{change_color}]{change_icon} {abs(net_change):,.2f} "
+                        f"({net_pct:+.1f}%)[/{change_color}]"
+                    )
+
+            console.print(
+                Panel.fit(
+                    "\n".join(summary_lines),
+                    title="Balance Sheet Summary",
+                    border_style="cyan",
+                )
+            )
 
             if not (result.assets or result.liabilities or result.equity):
                 console.print()
                 console.print("[yellow]No balance sheet data found for the selected date.[/yellow]")
                 return
 
-            _render_section("Asset Accounts", result.assets, "green")
-            _render_section("Liability Accounts", result.liabilities, "yellow")
-            _render_section("Equity Accounts", result.equity, "blue")
+            # Display detailed sections
+            show_comparison = result.comparison_date is not None
+            _render_section("Asset Accounts", result.assets, "green", show_comparison)
+            _render_section("Liability Accounts", result.liabilities, "yellow", show_comparison)
+            _render_section("Equity Accounts", result.equity, "blue", show_comparison)
+
+            # Handle export
+            if export:
+                export_path = Path(export)
+                if export_path.suffix.lower() == ".csv":
+                    _export_to_csv(export)
+                elif export_path.suffix.lower() == ".md":
+                    _export_to_markdown(export)
+                else:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Unknown export format '{export_path.suffix}'. "
+                        f"Supported: .csv, .md"
+                    )
+
+            # Handle chart
+            if chart:
+                _show_chart()
 
         except Exception as exc:
             console.print(f"[red]✗ Failed to generate report:[/red] {exc}")
