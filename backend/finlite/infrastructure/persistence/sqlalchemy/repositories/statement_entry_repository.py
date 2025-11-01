@@ -17,6 +17,9 @@ from finlite.domain.repositories.statement_entry_repository import IStatementEnt
 from finlite.infrastructure.persistence.sqlalchemy.mappers.statement_entry_mapper import (
     StatementEntryMapper,
 )
+from finlite.infrastructure.persistence.sqlalchemy.mappers._uuid_helpers import (
+    uuid_to_int,
+)
 from finlite.infrastructure.persistence.sqlalchemy.models import StatementEntryModel
 
 
@@ -117,7 +120,8 @@ class SqlAlchemyStatementEntryRepository(IStatementEntryRepository):
             >>> entry = repo.get(entry_id)
             >>> print(entry.memo)
         """
-        model = self._session.get(StatementEntryModel, entry_id)
+        key = uuid_to_int(entry_id) if isinstance(entry_id, UUID) else entry_id
+        model = self._session.get(StatementEntryModel, key)
         if model is None:
             raise StatementEntryNotFoundError(entry_id)
         return StatementEntryMapper.to_entity(model)
@@ -269,7 +273,8 @@ class SqlAlchemyStatementEntryRepository(IStatementEntryRepository):
             >>> repo.update(entry)
             >>> session.commit()
         """
-        model = self._session.get(StatementEntryModel, entry.id)
+        key = uuid_to_int(entry.id) if isinstance(entry.id, UUID) else entry.id
+        model = self._session.get(StatementEntryModel, key)
         if model is None:
             raise StatementEntryNotFoundError(entry.id)
 
@@ -290,7 +295,8 @@ class SqlAlchemyStatementEntryRepository(IStatementEntryRepository):
             >>> repo.delete(entry_id)
             >>> session.commit()
         """
-        model = self._session.get(StatementEntryModel, entry_id)
+        key = uuid_to_int(entry_id) if isinstance(entry_id, UUID) else entry_id
+        model = self._session.get(StatementEntryModel, key)
         if model is None:
             raise StatementEntryNotFoundError(entry_id)
 

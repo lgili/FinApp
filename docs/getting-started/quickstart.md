@@ -4,6 +4,18 @@ Get started with Finlite in 5 minutes. This guide will walk you through creating
 
 ---
 
+## Load Demo Data (Optional)
+
+If you want to explore the Textual TUI or reports with realistic information, populate the database with a multi-month demo dataset:
+
+```bash
+poetry run python backend/scripts/seed_demo_data.py --months 6
+```
+
+The script is idempotent—rerunning it refreshes the same sample accounts, transactions, and pending statement entries. Use `--database-url` to target a specific SQLite file and `--start-month YYYY-MM` to control the history window.
+
+---
+
 ## Your First Account
 
 Let's create a cash account:

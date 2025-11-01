@@ -9,11 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Iterable
 from uuid import UUID, uuid4
 
 from finlite.domain.value_objects.posting import Posting
-from finlite.domain.entities.statement_entry import StatementEntry
+from finlite.domain.entities.statement_entry import StatementEntry, StatementStatus
 from finlite.domain.entities.transaction import Transaction
 from finlite.domain.repositories.account_repository import IAccountRepository
 from finlite.domain.repositories.statement_entry_repository import IStatementEntryRepository
@@ -30,6 +30,7 @@ class PostPendingEntriesCommand:
     auto_post: bool = True  # Se True, posta automaticamente entries com suggested_account
     source_account_code: str = "Assets:Bank:Checking"  # Conta de origem padrão
     dry_run: bool = False  # Se True, apenas simula sem salvar
+    entry_ids: Optional[tuple[UUID, ...]] = None  # Se fornecido, limita aos IDs informados
 
 
 @dataclass
@@ -123,12 +124,19 @@ class PostPendingEntriesUseCase:
             if not source_account:
                 raise ValueError(f"Source account not found: {command.source_account_code}")
 
+            statement_repo = getattr(self.uow, "statement_repository", self.statement_repository)
+
             # 2. Buscar entries IMPORTED
+            ids_filter = set(command.entry_ids) if command.entry_ids else None
+
             if command.batch_id:
-                all_entries = self.statement_repository.find_by_batch_id(command.batch_id)
+                all_entries = statement_repo.find_by_batch_id(command.batch_id)
                 entries = [e for e in all_entries if e.is_imported()]
             else:
-                entries = self.statement_repository.find_by_status("imported")
+                entries = statement_repo.find_by_status(StatementStatus.IMPORTED)
+
+            if ids_filter is not None:
+                entries = [entry for entry in entries if entry.id in ids_filter]
 
             if not entries:
                 return PostPendingEntriesResult(
@@ -170,11 +178,11 @@ class PostPendingEntriesUseCase:
 
                     # 5. Salvar transaction (se não for dry-run)
                     if not command.dry_run:
-                        saved_transaction = self.transaction_repository.save(transaction)
+                        self.transaction_repository.add(transaction)
 
                         # 6. Marcar entry como POSTED
-                        entry.mark_posted(saved_transaction.id)
-                        self.statement_repository.save(entry)
+                        entry.mark_posted(transaction.id)
+                        statement_repo.update(entry)
 
                     # 7. Adicionar ao resultado
                     posted_entries.append(

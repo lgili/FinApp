@@ -551,6 +551,22 @@ LOG_LEVEL=INFO
 
 ## Tips & Tricks
 
+### Launch the Terminal UI
+
+Prefer navigating with a keyboard-first experience? Run:
+
+```bash
+fin tui
+```
+
+The TUI provides:
+
+- Dashboard with quick metrics and recent transactions
+- Inbox view to post imported entries (`A` to post, `/` to filter)
+- Command palette (`Ctrl+K`) for fuzzy navigation/actions
+
+Use arrow keys or number keys `1`–`6` to switch sections.
+
 ### Batch Account Creation
 
 Use a script to create multiple accounts:

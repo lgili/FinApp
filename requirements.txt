@@ -1,3 +1,5 @@
 SQLAlchemy>=2.0
 structlog>=22.1.0
 pytest>=7.0
+textual>=6.4.0
+rapidfuzz>=3.9.6

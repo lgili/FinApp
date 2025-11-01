@@ -54,6 +54,7 @@ class TestPostPendingEntriesUseCase:
         mock_transaction_repository,
     ):
         """Create use case instance."""
+        mock_uow.statement_repository = mock_statement_repository
         return PostPendingEntriesUseCase(
             uow=mock_uow,
             account_repository=mock_account_repository,
@@ -140,7 +141,7 @@ class TestPostPendingEntriesUseCase:
         def mock_save(transaction):
             return transaction
 
-        mock_transaction_repository.save.side_effect = mock_save
+        mock_transaction_repository.add.side_effect = mock_save
 
         # Execute
         result = use_case.execute(
@@ -164,7 +165,7 @@ class TestPostPendingEntriesUseCase:
         assert posted.target_account == "Expenses:Groceries"
 
         # Verify transaction was saved
-        mock_transaction_repository.save.assert_called_once()
+        mock_transaction_repository.add.assert_called_once()
 
     def test_post_income_entry(
         self,
@@ -199,7 +200,7 @@ class TestPostPendingEntriesUseCase:
         def mock_save(transaction):
             return transaction
 
-        mock_transaction_repository.save.side_effect = mock_save
+        mock_transaction_repository.add.side_effect = mock_save
 
         result = use_case.execute(
             PostPendingEntriesCommand(source_account_code="Assets:Bank:Checking")
@@ -209,6 +210,57 @@ class TestPostPendingEntriesUseCase:
         posted = result.posted_entries[0]
         assert posted.amount == Decimal("5000.00")
         assert posted.target_account == "Income:Salary"
+
+    def test_post_only_selected_entries(
+        self,
+        use_case,
+        mock_account_repository,
+        mock_statement_repository,
+        mock_transaction_repository,
+        source_account,
+        expense_account,
+    ):
+        """Posts only entries provided in entry_ids."""
+        entry_keep = StatementEntry.create(
+            batch_id=uuid4(),
+            external_id="SEL-001",
+            memo="Should post",
+            amount=Decimal("-20.00"),
+            currency="BRL",
+            occurred_at=datetime(2025, 9, 10),
+        )
+        entry_keep.suggest_account(expense_account.id)
+
+        entry_skip = StatementEntry.create(
+            batch_id=uuid4(),
+            external_id="SEL-002",
+            memo="Should skip",
+            amount=Decimal("-30.00"),
+            currency="BRL",
+            occurred_at=datetime(2025, 9, 11),
+        )
+        entry_skip.suggest_account(expense_account.id)
+
+        mock_statement_repository.find_by_status.return_value = [
+            entry_keep,
+            entry_skip,
+        ]
+        mock_account_repository.find_by_code.return_value = source_account
+        mock_account_repository.get.return_value = expense_account
+        mock_transaction_repository.add.side_effect = lambda txn: txn
+
+        result = use_case.execute(
+            PostPendingEntriesCommand(
+                source_account_code="Assets:Bank:Checking",
+                auto_post=True,
+                entry_ids=(entry_keep.id,),
+            )
+        )
+
+        assert result.total_entries == 1
+        assert result.posted_count == 1
+        assert result.posted_entries[0].entry_id == entry_keep.id
+        mock_transaction_repository.add.assert_called_once()
 
     def test_skip_entries_without_suggested_account(
         self,
@@ -274,7 +326,7 @@ class TestPostPendingEntriesUseCase:
 
         # Should report as posted but not actually save
         assert result.posted_count == 1
-        mock_transaction_repository.save.assert_not_called()
+        mock_transaction_repository.add.assert_not_called()
         mock_statement_repository.save.assert_not_called()
         mock_uow.commit.assert_not_called()
 
@@ -306,7 +358,7 @@ class TestPostPendingEntriesUseCase:
         def mock_save(transaction):
             return transaction
 
-        mock_transaction_repository.save.side_effect = mock_save
+        mock_transaction_repository.add.side_effect = mock_save
 
         result = use_case.execute(
             PostPendingEntriesCommand(
@@ -383,7 +435,7 @@ class TestPostPendingEntriesUseCase:
             saved_transaction = transaction
             return transaction
 
-        mock_transaction_repository.save.side_effect = capture_transaction
+        mock_transaction_repository.add.side_effect = capture_transaction
 
         use_case.execute(
             PostPendingEntriesCommand(source_account_code="Assets:Bank:Checking")

@@ -103,6 +103,15 @@ post_module.register_commands(post_app, get_container)
 reports_module.register_commands(report_app, get_container)
 export_module.register_commands(export_app, get_container)
 card_module.register_commands(card_app, get_container)
+
+
+@app.command("tui")
+def launch_tui() -> None:
+    """Launch the Finlite Textual UI."""
+    container = get_container()
+    from finlite.interfaces.tui.app import run_tui
+
+    run_tui(container)
 tax_module.register_commands(tax_app, get_container)
 
 

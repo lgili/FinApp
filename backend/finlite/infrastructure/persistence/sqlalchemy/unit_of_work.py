@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from finlite.infrastructure.persistence.sqlalchemy.repositories import (
     SqlAlchemyAccountRepository,
     SqlAlchemyCardStatementRepository,
+    SqlAlchemyStatementEntryRepository,
     SqlAlchemyTransactionRepository,
 )
 from finlite.infrastructure.persistence.unit_of_work import AbstractUnitOfWork
@@ -70,6 +71,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         # Inicializa repositories com a sessão
         self.accounts = SqlAlchemyAccountRepository(self.session)
         self.transactions = SqlAlchemyTransactionRepository(self.session)
+        self.statement_repository = SqlAlchemyStatementEntryRepository(self.session)
         self.card_statements = SqlAlchemyCardStatementRepository(self.session)
 
         return self

@@ -137,7 +137,7 @@ class StatementEntryMapper:
             >>> model = session.get(StatementEntryModel, entry.id)
             >>> StatementEntryMapper.update_model(model, entry)
         """
-        model.batch_id = entry.batch_id
+        model.batch_id = uuid_to_int(entry.batch_id)
         model.external_id = entry.external_id
         model.payee = entry.payee
         model.memo = entry.memo
@@ -145,7 +145,15 @@ class StatementEntryMapper:
         model.currency = entry.currency
         model.occurred_at = entry.occurred_at
         model.status = entry.status.value
-        model.suggested_account_id = entry.suggested_account_id
-        model.transaction_id = entry.transaction_id
+        model.suggested_account_id = (
+            uuid_to_int(entry.suggested_account_id)
+            if entry.suggested_account_id
+            else None
+        )
+        model.transaction_id = (
+            uuid_to_int(entry.transaction_id)
+            if entry.transaction_id
+            else None
+        )
         model.extra_data = entry.metadata  # mapped to 'metadata' column
         model.updated_at = entry.updated_at
